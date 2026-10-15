@@ -30,3 +30,15 @@ export async function borrarAdjunto(id: string, path: string) {
   await db.storage.from("adjuntos").remove([path]);
   await db.from("sg_pedido_adjuntos").delete().eq("id", id);
 }
+
+// Sube una sola imagen (p. ej. la foto de un ticket) a una carpeta del bucket «adjuntos». Devuelve la ruta o null.
+export async function subirImagenSuelta(archivo: File, carpeta: string): Promise<string | null> {
+  try {
+    const blob = await comprimirImagen(archivo);
+    const path = `${carpeta}/${crypto.randomUUID()}.jpg`;
+    const { error } = await supabaseBrowser().storage.from("adjuntos").upload(path, blob, { contentType: "image/jpeg" });
+    return error ? null : path;
+  } catch {
+    return null;
+  }
+}

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { resumir, type PedidoStat } from "@/lib/stats";
+import { resumir, type GastoStat, type PagoStat, type PedidoStat } from "@/lib/stats";
 import { ESTADO_LABEL, refPedido, type Estado } from "@/lib/types";
 import { eur, cn } from "@/lib/utils";
 import { completarTarea } from "./tareas/actions";
 import { PlancharBoton } from "@/components/PlancharBoton";
 
 export const dynamic = "force-dynamic";
+
+type PagoConPedido = PagoStat & { pedido_id: string };
 
 interface FilaPedido {
   id: string; numero: number; estado: Estado; total: number; pagado: boolean; pagado_en: string | null; created_at: string;
@@ -15,7 +17,7 @@ interface FilaPedido {
   sg_pedido_lineas: { tipo: string; cantidad: number; coste_unitario: number | null }[];
 }
 
-function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?: string; tono?: "bueno" | "malo" }) {
+function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?: React.ReactNode; tono?: "bueno" | "malo" }) {
   return (
     <div className="card">
       <p className="text-sm text-ink/60">{titulo}</p>
@@ -27,23 +29,34 @@ function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?
 
 export default async function Inicio() {
   const db = await supabaseServer();
-  const [{ data: ped, error }, { data: stock }, { data: tareas }] = await Promise.all([
+  const [{ data: ped, error }, { data: stock }, { data: tareas }, { data: pagosDb, error: errPagos }, { data: gastosDb }] = await Promise.all([
     db.from("sg_pedidos").select("id,numero,estado,total,pagado,pagado_en,created_at,fecha_entrega,cliente_id, sg_clientes(nombre), sg_pedido_lineas(tipo,cantidad,coste_unitario)"),
     db.from("sg_v_stock").select("valor,cantidad,reponer,tipo").eq("activa", true),
     db.from("sg_tareas").select("id,texto,vence").eq("completada", false).order("vence", { ascending: true, nullsFirst: false }).limit(6),
+    db.from("sg_pagos").select("pedido_id,importe,fecha"),
+    db.from("sg_gastos").select("importe,fecha"),
   ]);
   if (error) return <p className="card text-rust-dark">No se pudo leer: {error.message}</p>;
 
   const filas = (ped ?? []) as unknown as FilaPedido[];
+
+  // Cobros: de la tabla sg_pagos; si aún no existe (migración 0004 pendiente) se deducen de los pedidos marcados como pagados.
+  const pagos: PagoConPedido[] = errPagos
+    ? filas.filter((p) => p.pagado).map((p) => ({ pedido_id: p.id, importe: Number(p.total), fecha: (p.pagado_en ?? p.created_at).slice(0, 10) }))
+    : (pagosDb ?? []).map((x) => ({ pedido_id: x.pedido_id as string, importe: Number(x.importe), fecha: String(x.fecha) }));
+  const cobradoPorPedido = new Map<string, number>();
+  for (const x of pagos) cobradoPorPedido.set(x.pedido_id, (cobradoPorPedido.get(x.pedido_id) ?? 0) + x.importe);
+  const gastos: GastoStat[] = (gastosDb ?? []).map((g) => ({ importe: Number(g.importe), fecha: String(g.fecha) }));
+
   const stats: PedidoStat[] = filas.map((p) => ({
-    estado: p.estado, total: Number(p.total), pagado: p.pagado, pagado_en: p.pagado_en, created_at: p.created_at,
+    estado: p.estado, total: Number(p.total), cobrado: cobradoPorPedido.get(p.id) ?? 0, created_at: p.created_at,
     fecha_entrega: p.fecha_entrega, cliente_id: p.cliente_id, cliente: p.sg_clientes?.nombre ?? null,
     // Cuentan las prendas estampadas (nuestras o del cliente); los servicios no son prendas.
     uds: p.sg_pedido_lineas.filter((l) => l.tipo !== "servicio").reduce((s, l) => s + l.cantidad, 0),
     coste: p.sg_pedido_lineas.reduce((s, l) => s + Number(l.coste_unitario ?? 0) * l.cantidad, 0),
     sinCoste: p.sg_pedido_lineas.some((l) => l.coste_unitario === null),
   }));
-  const r = resumir(stats);
+  const r = resumir(stats, new Date(), pagos, gastos);
   const porId = new Map(filas.map((p, i) => [stats[i], p]));
 
   const valorStock = (stock ?? []).reduce((s, f) => s + Number(f.valor), 0);
@@ -69,8 +82,10 @@ export default async function Inicio() {
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-6">
         <Kpi titulo={`Vendido en ${mesNombre}`} valor={eur(r.vendidoMes)} sub={r.ticketMedio ? `ticket medio ${eur(r.ticketMedio)}` : undefined} />
         <Kpi titulo="Camisetas vendidas" valor={String(r.udsMes)} sub={`este mes · ${r.udsTotal} en total`} />
-        <Kpi titulo="Cobrado este mes" valor={eur(r.cobradoMes)} tono="bueno" />
-        <Kpi titulo="Por cobrar" valor={eur(r.porCobrar)} tono={r.porCobrar > 0 ? "malo" : undefined} sub="pedidos aceptados sin pagar" />
+        <Kpi titulo="Cobrado este mes" valor={eur(r.cobradoMes)} tono="bueno" sub="incluye anticipos" />
+        <Kpi titulo="Gastos del mes" valor={eur(r.gastosMes)} sub={<Link href="/gastos" className="font-semibold text-rust">Ver gastos</Link>} />
+        <Kpi titulo="Caja del mes" valor={eur(r.resultadoMes)} tono={r.resultadoMes >= 0 ? "bueno" : "malo"} sub="cobrado − gastos" />
+        <Kpi titulo="Por cobrar" valor={eur(r.porCobrar)} tono={r.porCobrar > 0 ? "malo" : undefined} sub="total de pedidos − cobros" />
         <Kpi titulo="Beneficio estimado" valor={eur(r.beneficioMes)} sub={r.margenMes === null ? "faltan costes de prenda" : `margen ${r.margenMes.toFixed(0)} %`} />
         <Kpi titulo="Pedidos en curso" valor={String(r.activos)} sub="aprobados → listos" />
         <Kpi titulo="Presupuestos abiertos" valor={String(r.posibles)} sub={`${eur(r.valorPosibles)} en juego${r.aceptacion !== null ? ` · aceptación ${r.aceptacion.toFixed(0)} %` : ""}`} />

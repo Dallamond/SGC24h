@@ -153,6 +153,7 @@ export async function actualizarPedido(id: string, input: NuevoPedido): Promise<
     await descontarStock(db, id, actual.numero);
   }
 
+  await recalcularPago(db, id); // el total puede haber cambiado: revisa si sigue pagado del todo
   refrescar();
   return { ok: true, id };
 }
@@ -202,10 +203,58 @@ export async function cambiarEstado(id: string, estado: (typeof ESTADOS)[number]
   refrescar();
 }
 
+// Recalcula «cobrado», «pagado» y método a partir de los cobros registrados del pedido.
+async function recalcularPago(db: Db, id: string) {
+  const [{ data: ped }, { data: pagos, error }] = await Promise.all([
+    db.from("sg_pedidos").select("total").eq("id", id).single(),
+    db.from("sg_pagos").select("importe,metodo,fecha").eq("pedido_id", id).order("fecha").order("created_at"),
+  ]);
+  if (!ped || error) return false;
+  const cobrado = r2((pagos ?? []).reduce((s, p) => s + Number(p.importe), 0));
+  const completo = cobrado > 0 && cobrado >= Number(ped.total) - 0.005;
+  const ultimo = pagos?.[pagos.length - 1];
+  await db
+    .from("sg_pedidos")
+    .update({ anticipo: cobrado, pagado: completo, metodo_pago: completo ? (ultimo?.metodo ?? null) : null, pagado_en: completo ? new Date(ultimo?.fecha ?? Date.now()).toISOString() : null })
+    .eq("id", id);
+  return true;
+}
+
+export async function registrarPago(id: string, importe: number, metodo: "efectivo" | "bizum") {
+  z.object({ id: z.string().uuid(), importe: z.number().positive().max(100000), metodo: z.enum(["efectivo", "bizum"]) }).parse({ id, importe, metodo });
+  const db = await supabaseServer();
+  const { error } = await db.from("sg_pagos").insert({ pedido_id: id, importe: r2(importe), metodo });
+  if (error) return { ok: false as const, error: error.message };
+  await recalcularPago(db, id);
+  refrescar();
+  return { ok: true as const };
+}
+
+export async function borrarPago(pagoId: string, pedidoId: string) {
+  z.object({ pagoId: z.string().uuid(), pedidoId: z.string().uuid() }).parse({ pagoId, pedidoId });
+  const db = await supabaseServer();
+  await db.from("sg_pagos").delete().eq("id", pagoId);
+  await recalcularPago(db, pedidoId);
+  refrescar();
+}
+
+// Atajo de los botones «Pagado en efectivo/Bizum»: cobra lo que falte (o quita todos los cobros).
 export async function marcarPagado(id: string, pagado: boolean, metodo: "efectivo" | "bizum" | null) {
   z.object({ id: z.string().uuid() }).parse({ id });
   const db = await supabaseServer();
-  await db.from("sg_pedidos").update({ pagado, metodo_pago: pagado ? metodo : null, pagado_en: pagado ? new Date().toISOString() : null }).eq("id", id);
+  const { data: ped } = await db.from("sg_pedidos").select("total,anticipo").eq("id", id).single();
+  if (!ped) return;
+
+  if (pagado) {
+    const resto = r2(Number(ped.total) - Number(ped.anticipo ?? 0));
+    const { error } = resto > 0 ? await db.from("sg_pagos").insert({ pedido_id: id, importe: resto, metodo: metodo ?? "efectivo" }) : { error: null };
+    if (!error && (await recalcularPago(db, id))) return refrescar();
+    // Sin la tabla de cobros (migración 0004 pendiente) se mantiene el comportamiento anterior.
+    await db.from("sg_pedidos").update({ pagado: true, metodo_pago: metodo, pagado_en: new Date().toISOString() }).eq("id", id);
+  } else {
+    await db.from("sg_pagos").delete().eq("pedido_id", id);
+    await db.from("sg_pedidos").update({ pagado: false, metodo_pago: null, pagado_en: null, anticipo: 0 }).eq("id", id);
+  }
   refrescar();
 }
 

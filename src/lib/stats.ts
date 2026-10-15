@@ -2,8 +2,7 @@
 export interface PedidoStat {
   estado: "posible" | "aprobado" | "diseno" | "produccion" | "listo" | "entregado" | "descartado";
   total: number;
-  pagado: boolean;
-  pagado_en: string | null;
+  cobrado: number; // suma de los cobros registrados del pedido
   created_at: string;
   fecha_entrega: string | null;
   cliente_id: string | null;
@@ -13,13 +12,25 @@ export interface PedidoStat {
   sinCoste: boolean; // alguna línea no tiene coste
 }
 
+export interface PagoStat {
+  importe: number;
+  fecha: string; // YYYY-MM-DD
+}
+
+export interface GastoStat {
+  importe: number;
+  fecha: string; // YYYY-MM-DD
+}
+
 export interface Resumen {
   activos: number;          // aprobado → listo
   posibles: number;
   valorPosibles: number;
-  porCobrar: number;        // pedidos aceptados sin cobrar
+  porCobrar: number;        // pedidos aceptados: total − lo ya cobrado
   vendidoMes: number;
-  cobradoMes: number;
+  cobradoMes: number;       // cobros registrados este mes
+  gastosMes: number;
+  resultadoMes: number;     // cobrado − gastos (caja del mes)
   beneficioMes: number;     // estimado, solo pedidos con coste conocido
   margenMes: number | null; // %
   ticketMedio: number | null;
@@ -35,15 +46,14 @@ const aceptado = (e: PedidoStat["estado"]) => !["posible", "descartado"].include
 const claveMes = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-export function resumir(pedidos: PedidoStat[], ahora = new Date()): Resumen {
+export function resumir(pedidos: PedidoStat[], ahora = new Date(), pagos: PagoStat[] = [], gastos: GastoStat[] = []): Resumen {
   const mesActual = claveMes(ahora);
   const aceptados = pedidos.filter((p) => aceptado(p.estado));
 
   const delMes = aceptados.filter((p) => claveMes(new Date(p.created_at)) === mesActual);
   const vendidoMes = delMes.reduce((s, p) => s + p.total, 0);
-  const cobradoMes = aceptados
-    .filter((p) => p.pagado && claveMes(new Date(p.pagado_en ?? p.created_at)) === mesActual)
-    .reduce((s, p) => s + p.total, 0);
+  const cobradoMes = pagos.filter((p) => p.fecha.slice(0, 7) === mesActual).reduce((s, p) => s + p.importe, 0);
+  const gastosMes = gastos.filter((g) => g.fecha.slice(0, 7) === mesActual).reduce((s, g) => s + g.importe, 0);
 
   const conCoste = delMes.filter((p) => !p.sinCoste);
   const ingresoConCoste = conCoste.reduce((s, p) => s + p.total, 0);
@@ -79,9 +89,11 @@ export function resumir(pedidos: PedidoStat[], ahora = new Date()): Resumen {
     activos: pedidos.filter((p) => ["aprobado", "diseno", "produccion", "listo"].includes(p.estado)).length,
     posibles: pedidos.filter((p) => p.estado === "posible").length,
     valorPosibles: pedidos.filter((p) => p.estado === "posible").reduce((s, p) => s + p.total, 0),
-    porCobrar: aceptados.filter((p) => !p.pagado).reduce((s, p) => s + p.total, 0),
+    porCobrar: aceptados.reduce((s, p) => s + Math.max(0, p.total - p.cobrado), 0),
     vendidoMes,
     cobradoMes,
+    gastosMes,
+    resultadoMes: cobradoMes - gastosMes,
     beneficioMes,
     margenMes: ingresoConCoste > 0 ? (beneficioMes / ingresoConCoste) * 100 : null,
     ticketMedio: delMes.length ? vendidoMes / delMes.length : null,

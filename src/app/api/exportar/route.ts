@@ -7,8 +7,11 @@ export const dynamic = "force-dynamic";
 // Orden pensado para poder restaurar: primero lo que no depende de nada.
 const TABLAS = [
   "sg_clientes", "sg_prendas", "sg_stock_lineas", "sg_stock_movimientos",
-  "sg_pedidos", "sg_pedido_lineas", "sg_pedido_adjuntos", "sg_tareas",
+  "sg_pedidos", "sg_pedido_lineas", "sg_pedido_adjuntos", "sg_pagos", "sg_gastos", "sg_tareas",
 ] as const;
+
+// Tablas de migraciones recientes: si aún no existen se exportan vacías en lugar de fallar.
+const OPCIONALES = new Set<string>(["sg_pagos", "sg_gastos"]);
 
 const PAGINA = 1000; // Supabase devuelve como máximo 1000 filas por consulta
 
@@ -23,7 +26,10 @@ export async function GET() {
     for (let desde = 0; ; desde += PAGINA) {
       // Orden estable por id para que la paginación no repita ni salte filas.
       const { data, error } = await db.from(tabla).select("*").order("id").range(desde, desde + PAGINA - 1);
-      if (error) return new Response(`Error leyendo ${tabla}: ${error.message}`, { status: 500 });
+      if (error) {
+        if (OPCIONALES.has(tabla)) break;
+        return new Response(`Error leyendo ${tabla}: ${error.message}`, { status: 500 });
+      }
       filas.push(...(data as Record<string, unknown>[]));
       if (data.length < PAGINA) break;
     }

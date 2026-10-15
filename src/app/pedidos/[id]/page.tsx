@@ -6,7 +6,7 @@ import { eur } from "@/lib/utils";
 import { TAMANOS_ZONA } from "@/lib/pricing";
 import { colorDe } from "@/lib/shirt";
 import { ShirtPreview } from "@/components/ShirtPreview";
-import { cambiarEstado, marcarPagado } from "../actions";
+import { borrarPago, cambiarEstado, marcarPagado, registrarPago } from "../actions";
 import { BotonPdf } from "./BotonPdf";
 import { Adjuntos, type AdjuntoItem } from "./Adjuntos";
 
@@ -35,13 +35,25 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
   const coste = lineas.reduce((s, l) => s + Number(l.coste_unitario ?? 0) * l.cantidad, 0);
   const sinCoste = lineas.some((l) => l.coste_unitario === null);
 
+  const { data: pagosDb, error: errPagos } = await db.from("sg_pagos").select("id,importe,metodo,fecha").eq("pedido_id", id).order("fecha").order("created_at");
+  const pagos = pagosDb ?? [];
+  const cobrado = pagos.reduce((s, x) => s + Number(x.importe), 0);
+  const resto = Math.max(0, Math.round((Number(p.total) - cobrado) * 100) / 100);
+
+  async function cobrar(f: FormData) {
+    "use server";
+    const importe = Number(String(f.get("importe") ?? "").replace(",", "."));
+    if (!(importe > 0)) return;
+    await registrarPago(id, importe, f.get("metodo") === "bizum" ? "bizum" : "efectivo");
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link href="/pedidos" className="text-sm text-ink/50 hover:text-rust">← Pedidos</Link>
           <h1 className="text-2xl font-bold">{ref} · {p.sg_clientes?.nombre ?? "Sin cliente"}</h1>
-          <p className="text-sm text-ink/60">{ESTADO_LABEL[p.estado]} · {new Date(p.created_at).toLocaleDateString("es-ES")}{p.pagado ? ` · pagado (${p.metodo_pago})` : " · sin pagar"}</p>
+          <p className="text-sm text-ink/60">{ESTADO_LABEL[p.estado]} · {new Date(p.created_at).toLocaleDateString("es-ES")}{p.pagado ? ` · pagado (${p.metodo_pago})` : cobrado > 0 ? ` · anticipo ${eur(cobrado)}` : " · sin pagar"}</p>
         </div>
         <BotonPdf
           imagenes={adjuntos.map((a) => a.url)}
@@ -95,16 +107,47 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
 
       <Adjuntos pedidoId={id} items={adjuntos} />
 
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-bold">Cobros</h2>
+          <p className="text-sm">
+            Cobrado <b>{eur(cobrado)}</b> de {eur(Number(p.total))}
+            {resto > 0 ? <span className="ml-2 font-semibold text-rust-dark">Faltan {eur(resto)}</span> : <span className="ml-2 font-semibold text-sage-dark">Pagado ✓</span>}
+          </p>
+        </div>
+        {errPagos && <p className="text-sm text-rust-dark">No se pueden leer los cobros: ¿has ejecutado la migración 0004?</p>}
+        {pagos.length > 0 && (
+          <ul className="divide-y divide-ink/5 text-sm">
+            {pagos.map((x) => (
+              <li key={x.id} className="flex items-center justify-between py-1.5">
+                <span>{new Date(x.fecha).toLocaleDateString("es-ES")} · {x.metodo}</span>
+                <span className="flex items-center gap-3"><b>{eur(Number(x.importe))}</b>
+                  <form action={borrarPago.bind(null, x.id, id)}><button className="text-ink/30 hover:text-rust" aria-label="Quitar cobro">✕</button></form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {resto > 0 && (
+          <form action={cobrar} className="flex flex-wrap items-end gap-2">
+            <div className="w-32"><label>Importe (€)</label><input name="importe" inputMode="decimal" defaultValue={String(resto).replace(".", ",")} required /></div>
+            <div className="w-32"><label>Método</label><select name="metodo"><option value="efectivo">Efectivo</option><option value="bizum">Bizum</option></select></div>
+            <button className="btn">Registrar cobro</button>
+            <span className="pb-2 text-xs text-ink/50">Para un anticipo, pon un importe menor.</span>
+          </form>
+        )}
+      </section>
+
       <div className="flex flex-wrap gap-2">
         <Link href={`/pedidos/${p.id}/editar`} className="btn-ghost">Editar</Link>
         <Link href={`/pedidos/nuevo?duplicar=${p.id}`} className="btn-ghost">Duplicar</Link>
         {!p.pagado && (
           <>
-            <form action={marcarPagado.bind(null, p.id, true, "efectivo")}><button className="btn-ghost">Pagado en efectivo</button></form>
-            <form action={marcarPagado.bind(null, p.id, true, "bizum")}><button className="btn-ghost">Pagado por Bizum</button></form>
+            <form action={marcarPagado.bind(null, p.id, true, "efectivo")}><button className="btn-ghost">Cobrar el resto en efectivo</button></form>
+            <form action={marcarPagado.bind(null, p.id, true, "bizum")}><button className="btn-ghost">Cobrar el resto por Bizum</button></form>
           </>
         )}
-        {p.pagado && <form action={marcarPagado.bind(null, p.id, false, null)}><button className="btn-ghost">Quitar pagado</button></form>}
+        {cobrado > 0 && <form action={marcarPagado.bind(null, p.id, false, null)}><button className="btn-ghost">Quitar todos los cobros</button></form>}
         {p.estado === "descartado"
           ? <form action={cambiarEstado.bind(null, p.id, "posible")}><button className="btn-ghost">Recuperar</button></form>
           : <form action={cambiarEstado.bind(null, p.id, "descartado")}><button className="btn-ghost">Descartar</button></form>}

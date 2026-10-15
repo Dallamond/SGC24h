@@ -35,6 +35,8 @@ export default async function Inventario() {
         <h1 className="text-2xl font-bold">Inventario</h1>
         <div className="flex gap-2">
           <PlancharBoton />
+          <Link href="/inventario/compra" className="btn-ghost">+ Compra</Link>
+          <Link href="/inventario/historial" className="btn-ghost">Historial</Link>
           <Link href="/inventario/nueva" className="btn-ghost">+ Prenda</Link>
         </div>
       </div>

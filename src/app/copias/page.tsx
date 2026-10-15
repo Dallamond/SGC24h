@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const TABLAS: [string, string][] = [
   ["sg_clientes", "Clientes"], ["sg_pedidos", "Pedidos"], ["sg_pedido_lineas", "Líneas de pedido"],
   ["sg_prendas", "Modelos de prenda"], ["sg_stock_lineas", "Líneas de stock"], ["sg_stock_movimientos", "Movimientos de stock"],
-  ["sg_pedido_adjuntos", "Imágenes adjuntas"], ["sg_tareas", "Tareas"],
+  ["sg_pedido_adjuntos", "Imágenes adjuntas"], ["sg_pagos", "Cobros"], ["sg_gastos", "Gastos"], ["sg_tareas", "Tareas"],
 ];
 
 export default async function Copias() {
