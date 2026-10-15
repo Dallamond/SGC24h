@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Todo el sistema es privado: sin sesión, a /login.
 export async function middleware(req: NextRequest) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return new NextResponse("Faltan NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en las variables de entorno de Vercel.", { status: 503 });
+  }
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
