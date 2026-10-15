@@ -5,7 +5,12 @@ import "./globals.css";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk", weight: ["400", "500", "600", "700"] });
 
-export const metadata: Metadata = { title: "SGC24h — gestión Camis24h", robots: { index: false } };
+export const metadata: Metadata = {
+  title: "SGC24h — gestión Camis24h",
+  robots: { index: false },
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "C24H Gestión", statusBarStyle: "default" },
+};
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#C1502E" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
