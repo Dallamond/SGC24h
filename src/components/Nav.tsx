@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/tareas", label: "Tareas" },
   { href: "/clientes", label: "Clientes" },
   { href: "/inventario", label: "Inventario" },
+  { href: "/copias", label: "Copias" },
 ];
 
 export function Nav() {
@@ -27,11 +28,11 @@ export function Nav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur">
-      <div className="mx-auto flex max-w-[1800px] items-center justify-between px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6">
         <Link href="/" className="text-lg font-bold tracking-tight">
           camis24h <span className="text-rust">gestión</span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm font-semibold">
+        <nav className="flex flex-wrap items-center justify-end gap-1 text-sm font-semibold">
           {LINKS.map((l) => (
             <Link
               key={l.href}

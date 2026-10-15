@@ -96,6 +96,8 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
       <Adjuntos pedidoId={id} items={adjuntos} />
 
       <div className="flex flex-wrap gap-2">
+        <Link href={`/pedidos/${p.id}/editar`} className="btn-ghost">Editar</Link>
+        <Link href={`/pedidos/nuevo?duplicar=${p.id}`} className="btn-ghost">Duplicar</Link>
         {!p.pagado && (
           <>
             <form action={marcarPagado.bind(null, p.id, true, "efectivo")}><button className="btn-ghost">Pagado en efectivo</button></form>

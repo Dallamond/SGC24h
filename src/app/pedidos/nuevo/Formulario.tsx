@@ -8,23 +8,13 @@ import {
 } from "@/lib/pricing";
 import { TALLAS, TALLA_LABEL, type TipoLinea } from "@/lib/types";
 import { eur, cn } from "@/lib/utils";
-import { crearPedido } from "../actions";
+import { actualizarPedido, crearPedido } from "../actions";
+import type { Inicial, LineaForm } from "@/lib/pedidoForm";
 import { ShirtPreview } from "@/components/ShirtPreview";
 import { colorDe } from "@/lib/shirt";
 import { subirAdjuntos } from "@/lib/adjuntos";
 
 export interface PrendaOpt { id: string; nombre_oficial: string; gramaje: number | null; colores: string[] }
-
-interface LineaForm {
-  tipo: TipoLinea;
-  prendaId: string; // prendas de inventario
-  libre: string;    // descripción libre (estampado propio / servicio)
-  color: string;
-  tallas: Record<string, number>;
-  unidades: string; // estampado propio y servicios
-  zonas: ZonaPedido[];
-  precioManual: string; // vacío = usar el calculado
-}
 
 interface Borrador {
   clienteId: string; nuevoNombre: string; nuevoContacto: string;
@@ -43,17 +33,27 @@ const TIPOS: { id: TipoLinea; label: string }[] = [
   { id: "servicio", label: "Servicio" },
 ];
 
-export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { id: string; nombre: string }[]; prendas: PrendaOpt[]; clienteInicial: string }) {
+interface Props {
+  clientes: { id: string; nombre: string }[];
+  prendas: PrendaOpt[];
+  clienteInicial: string;
+  inicial?: Inicial;   // datos de un pedido existente (editar) o de uno a duplicar
+  pedidoId?: string;   // si viene, se edita ese pedido en lugar de crear uno nuevo
+  referencia?: string; // C24H-0003, para el título al editar
+}
+
+export function Formulario({ clientes, prendas, clienteInicial, inicial, pedidoId, referencia }: Props) {
   const router = useRouter();
-  const [clienteId, setClienteId] = useState(clienteInicial);
+  const usaBorrador = !pedidoId && !inicial; // el borrador local solo se usa al crear desde cero
+  const [clienteId, setClienteId] = useState(inicial?.clienteId ?? clienteInicial);
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoContacto, setNuevoContacto] = useState("");
-  const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA()]);
-  const [envio, setEnvio] = useState("");
-  const [descuento, setDescuento] = useState("");
-  const [validez, setValidez] = useState("15");
-  const [entrega, setEntrega] = useState("");
-  const [notas, setNotas] = useState("");
+  const [lineas, setLineas] = useState<LineaForm[]>(inicial?.lineas.length ? inicial.lineas : [LINEA_VACIA()]);
+  const [envio, setEnvio] = useState(inicial?.envio ?? "");
+  const [descuento, setDescuento] = useState(inicial?.descuento ?? "");
+  const [validez, setValidez] = useState(inicial?.validez ?? "15");
+  const [entrega, setEntrega] = useState(inicial?.entrega ?? "");
+  const [notas, setNotas] = useState(inicial?.notas ?? "");
   const [archivos, setArchivos] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [cargado, setCargado] = useState(false);
@@ -61,6 +61,7 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
 
   // Borrador local: si se corta la conexión o se cierra la pestaña, no se pierde el formulario.
   useEffect(() => {
+    if (!usaBorrador) return setCargado(true);
     try {
       const b: Borrador | null = JSON.parse(localStorage.getItem(KEY) ?? "null");
       if (b) {
@@ -70,14 +71,14 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
       }
     } catch { /* sin borrador */ }
     setCargado(true);
-  }, [clienteInicial]);
+  }, [clienteInicial, usaBorrador]);
 
   useEffect(() => {
-    if (!cargado) return;
+    if (!cargado || !usaBorrador) return;
     try {
       localStorage.setItem(KEY, JSON.stringify({ clienteId, nuevoNombre, nuevoContacto, lineas, envio, descuento, validez, entrega, notas } satisfies Borrador));
     } catch { /* almacenamiento no disponible */ }
-  }, [cargado, clienteId, nuevoNombre, nuevoContacto, lineas, envio, descuento, validez, entrega, notas]);
+  }, [cargado, usaBorrador, clienteId, nuevoNombre, nuevoContacto, lineas, envio, descuento, validez, entrega, notas]);
 
   const calculadas = useMemo(
     () =>
@@ -116,7 +117,7 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
     }
     const prendaPorId = new Map(prendas.map((p) => [p.id, p]));
     start(async () => {
-      const r = await crearPedido({
+      const datos = {
         cliente_id: clienteId || null,
         cliente_nuevo: clienteId ? null : nuevoNombre.trim() ? { nombre: nuevoNombre, contacto: nuevoContacto } : null,
         lineas: lineas.map((l, i) => {
@@ -146,20 +147,23 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
         validez_dias: Math.max(1, Math.floor(num(validez)) || 15),
         fecha_entrega: entrega || null,
         notas: notas.trim() || null,
-      });
+      };
+      const r = pedidoId ? await actualizarPedido(pedidoId, datos) : await crearPedido(datos);
       if (!r.ok) return setError(r.error);
       if (archivos.length) {
         const subidas = await subirAdjuntos(r.id, archivos);
         if (subidas < archivos.length) alert(`Se guardó el presupuesto, pero solo se subieron ${subidas} de ${archivos.length} imágenes. Puedes añadirlas desde el detalle.`);
       }
-      try { localStorage.removeItem(KEY); } catch { /* nada */ }
+      if (usaBorrador) try { localStorage.removeItem(KEY); } catch { /* nada */ }
       router.push(`/pedidos/${r.id}`);
+      router.refresh();
     });
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">Nuevo presupuesto</h1>
+      <h1 className="text-2xl font-bold">{pedidoId ? `Editar ${referencia ?? "pedido"}` : inicial ? "Duplicar pedido" : "Nuevo presupuesto"}</h1>
+      {pedidoId && <p className="-mt-2 text-sm text-ink/50">Las imágenes ya subidas se gestionan desde el detalle del pedido. Si el stock ya estaba descontado, se recalcula con los cambios.</p>}
 
       <section className="card space-y-3">
         <h2 className="font-bold">Cliente</h2>
@@ -307,7 +311,7 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
         {error && <p className="mb-2 text-sm text-rust-dark">{error}</p>}
         <div className="flex items-center justify-between gap-3">
           <p className="text-xl font-bold">{eur(total)}</p>
-          <button className="btn" onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar presupuesto"}</button>
+          <button className="btn" onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : pedidoId ? "Guardar cambios" : "Guardar presupuesto"}</button>
         </div>
       </div>
     </div>

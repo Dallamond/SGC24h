@@ -37,34 +37,29 @@ const pedidoSchema = z.object({
 });
 
 export type NuevoPedido = z.infer<typeof pedidoSchema>;
+type Resultado = { ok: true; id: string } | { ok: false; error: string };
+type Db = Awaited<ReturnType<typeof supabaseServer>>;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const refrescar = () => revalidatePath("/", "layout");
 
-export async function crearPedido(input: NuevoPedido): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const p = pedidoSchema.safeParse(input);
-  if (!p.success) return { ok: false, error: "Faltan datos: revisa cliente, unidades y zonas de cada línea" };
-  const d = p.data;
-  if (!d.cliente_id && !d.cliente_nuevo) return { ok: false, error: "Elige un cliente o crea uno nuevo" };
+async function resolverCliente(db: Db, d: NuevoPedido): Promise<{ id: string | null; error?: string }> {
+  if (d.cliente_id) return { id: d.cliente_id };
+  if (!d.cliente_nuevo) return { id: null, error: "Elige un cliente o crea uno nuevo" };
+  const { data, error } = await db
+    .from("sg_clientes")
+    .insert({ nombre: d.cliente_nuevo.nombre, contacto: d.cliente_nuevo.contacto || null })
+    .select("id")
+    .single();
+  return error ? { id: null, error: error.message } : { id: data.id };
+}
 
-  const db = await supabaseServer();
-
-  let clienteId = d.cliente_id;
-  if (!clienteId && d.cliente_nuevo) {
-    const { data, error } = await db
-      .from("sg_clientes")
-      .insert({ nombre: d.cliente_nuevo.nombre, contacto: d.cliente_nuevo.contacto || null })
-      .select("id")
-      .single();
-    if (error) return { ok: false, error: error.message };
-    clienteId = data.id;
-  }
-
-  // El total se recalcula aquí: no se confía en el navegador.
+// Total recalculado en el servidor y líneas listas para insertar (con la foto del coste de cada prenda).
+async function prepararDatos(db: Db, d: NuevoPedido) {
   const subtotal = d.lineas.reduce((s, l) => s + l.precio_unitario * l.cantidad, 0);
   const total = r2(Math.max(0, subtotal + d.envio - d.descuento));
 
-  // Foto del coste de compra de cada prenda al crear la línea. Precio 0 = "sin definir" → coste desconocido.
+  // Precio de compra 0 = "sin definir" → coste desconocido (no se cuenta como beneficio total).
   const ids = [...new Set(d.lineas.map((l) => l.prenda_id).filter((x): x is string => !!x))];
   const costes = new Map<string, number>();
   if (ids.length) {
@@ -72,10 +67,32 @@ export async function crearPedido(input: NuevoPedido): Promise<{ ok: true; id: s
     data?.forEach((x) => Number(x.precio_compra) > 0 && costes.set(x.id, Number(x.precio_compra)));
   }
 
+  const filas = (pedidoId: string) =>
+    d.lineas.map((l) => ({
+      ...l,
+      color: l.color ? l.color.toLowerCase() : null,
+      pedido_id: pedidoId,
+      // Estampado propio y servicios no tienen coste de prenda: 0 conocido, no "desconocido".
+      coste_unitario: l.tipo !== "prenda" ? 0 : l.prenda_id ? (costes.get(l.prenda_id) ?? null) : null,
+    }));
+
+  return { total, filas };
+}
+
+export async function crearPedido(input: NuevoPedido): Promise<Resultado> {
+  const p = pedidoSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: "Faltan datos: revisa cliente, unidades y zonas de cada línea" };
+  const d = p.data;
+  const db = await supabaseServer();
+
+  const cliente = await resolverCliente(db, d);
+  if (cliente.error) return { ok: false, error: cliente.error };
+  const { total, filas } = await prepararDatos(db, d);
+
   const { data: pedido, error } = await db
     .from("sg_pedidos")
     .insert({
-      cliente_id: clienteId,
+      cliente_id: cliente.id,
       envio: d.envio,
       descuento: d.descuento,
       total,
@@ -87,15 +104,7 @@ export async function crearPedido(input: NuevoPedido): Promise<{ ok: true; id: s
     .single();
   if (error) return { ok: false, error: error.message };
 
-  const { error: e2 } = await db.from("sg_pedido_lineas").insert(
-    d.lineas.map((l) => ({
-      ...l,
-      color: l.color ? l.color.toLowerCase() : null,
-      pedido_id: pedido.id,
-      // Estampado propio y servicios no tienen coste de prenda: 0 conocido, no "desconocido".
-      coste_unitario: l.tipo !== "prenda" ? 0 : l.prenda_id ? (costes.get(l.prenda_id) ?? null) : null,
-    })),
-  );
+  const { error: e2 } = await db.from("sg_pedido_lineas").insert(filas(pedido.id));
   if (e2) {
     await db.from("sg_pedidos").delete().eq("id", pedido.id);
     return { ok: false, error: e2.message };
@@ -105,7 +114,48 @@ export async function crearPedido(input: NuevoPedido): Promise<{ ok: true; id: s
   return { ok: true, id: pedido.id };
 }
 
-type Db = Awaited<ReturnType<typeof supabaseServer>>;
+// Edita un pedido existente. Si ya había descontado stock, lo devuelve antes de cambiar las líneas
+// y vuelve a descontar con las líneas nuevas (así el inventario siempre refleja el pedido actual).
+export async function actualizarPedido(id: string, input: NuevoPedido): Promise<Resultado> {
+  z.string().uuid().parse(id);
+  const p = pedidoSchema.safeParse(input);
+  if (!p.success) return { ok: false, error: "Faltan datos: revisa cliente, unidades y zonas de cada línea" };
+  const d = p.data;
+  const db = await supabaseServer();
+
+  const { data: actual } = await db.from("sg_pedidos").select("numero,estado,stock_descontado").eq("id", id).single();
+  if (!actual) return { ok: false, error: "Pedido no encontrado" };
+
+  const cliente = await resolverCliente(db, d);
+  if (cliente.error) return { ok: false, error: cliente.error };
+  const { total, filas } = await prepararDatos(db, d);
+
+  // Copia de las líneas antiguas por si la inserción de las nuevas falla.
+  const { data: antiguas } = await db.from("sg_pedido_lineas").select("*").eq("pedido_id", id);
+
+  if (actual.stock_descontado) await devolverStock(db, id, actual.numero);
+
+  const { error } = await db
+    .from("sg_pedidos")
+    .update({ cliente_id: cliente.id, envio: d.envio, descuento: d.descuento, total, validez_dias: d.validez_dias, fecha_entrega: d.fecha_entrega || null, notas: d.notas || null })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  await db.from("sg_pedido_lineas").delete().eq("pedido_id", id);
+  const { error: e2 } = await db.from("sg_pedido_lineas").insert(filas(id));
+  if (e2) {
+    if (antiguas?.length) await db.from("sg_pedido_lineas").insert(antiguas);
+    if (actual.stock_descontado) await descontarStock(db, id, actual.numero);
+    return { ok: false, error: e2.message };
+  }
+
+  if (actual.estado !== "descartado" && ESTADOS.indexOf(actual.estado) >= ESTADOS.indexOf("listo")) {
+    await descontarStock(db, id, actual.numero);
+  }
+
+  refrescar();
+  return { ok: true, id };
+}
 
 // Al llegar a "Listo" se restan del inventario las prendas del pedido (solo líneas tipo prenda).
 async function descontarStock(db: Db, pedidoId: string, numero: number) {
