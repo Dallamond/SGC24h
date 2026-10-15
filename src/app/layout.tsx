@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={grotesk.variable}>
       <body className="min-h-screen">
         <Nav />
-        <main className="mx-auto max-w-5xl px-4 py-5">{children}</main>
+        <main className="mx-auto max-w-[1800px] px-4 py-5 sm:px-6">{children}</main>
       </body>
     </html>
   );

@@ -96,17 +96,15 @@ export async function crearPedido(input: NuevoPedido): Promise<{ ok: true; id: s
 export async function cambiarEstado(id: string, estado: (typeof ESTADOS)[number] | "descartado") {
   z.object({ id: z.string().uuid(), estado: z.enum([...ESTADOS, "descartado"]) }).parse({ id, estado });
   const db = await supabaseServer();
-  await db.from("sg_pedidos").update({ estado }).eq("id", id);
-  revalidatePath("/pedidos");
-  revalidatePath(`/pedidos/${id}`);
+  await db.from("sg_pedidos").update({ estado, entregado_en: estado === "entregado" ? new Date().toISOString() : null }).eq("id", id);
+  revalidatePath("/", "layout");
 }
 
 export async function marcarPagado(id: string, pagado: boolean, metodo: "efectivo" | "bizum" | null) {
   z.object({ id: z.string().uuid() }).parse({ id });
   const db = await supabaseServer();
-  await db.from("sg_pedidos").update({ pagado, metodo_pago: pagado ? metodo : null }).eq("id", id);
-  revalidatePath("/pedidos");
-  revalidatePath(`/pedidos/${id}`);
+  await db.from("sg_pedidos").update({ pagado, metodo_pago: pagado ? metodo : null, pagado_en: pagado ? new Date().toISOString() : null }).eq("id", id);
+  revalidatePath("/", "layout");
 }
 
 export async function marcarDtf(id: string, recogido: boolean) {

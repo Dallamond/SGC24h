@@ -3,7 +3,14 @@
 Sistema de gestión interno de Camis24h (inventario, presupuestos, pedidos). Hoja de ruta: `Sistema de Gestión MVP.md` en la vault.
 Supabase propio, en otra cuenta distinta a la de la web (no comparten BD).
 
-## Hecho
+## Hecho (v2 · 15/10/2026 noche)
+- Inicio con KPIs (vendido, cobrado, por cobrar, beneficio estimado, aceptación), ventas 6 meses, entregas, mejores clientes, tareas e inventario.
+- Tareas con fecha límite y completar. Tablero a ancho completo sin scroll horizontal.
+- Inventario agrupado por modelo con recuento editable, precio y mínimo; botón «Cargar catálogo base» (camisetas 220/190, sudaderas, polos, totebags).
+- PDF maquetado con cabecera, datos, camisetas con las zonas de estampado (delante/espalda) y totales.
+- Migración `0002_tareas_stats_totebag.sql` (ejecutar antes de desplegar).
+
+## Hecho (v1)
 - Base: Next 15 + Supabase (auth) + Tailwind, paleta de Camis24h. Esquema en `supabase/migrations/0001_init.sql`.
 - Precios (`src/lib/pricing.ts`) con recargo por zona del primer diseño, con tests.
 - Inventario: valor en stock, a reponer, alta de prenda, pantalla Planchar (−1/−2 atómico con rastro).

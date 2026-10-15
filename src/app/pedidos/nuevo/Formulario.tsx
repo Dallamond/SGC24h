@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { TAMANOS_ZONA, calcularPrecio, type TamanoZona, type Vista, type ZonaPedido } from "@/lib/pricing";
-import { TALLAS } from "@/lib/types";
+import { TALLAS, TALLA_LABEL } from "@/lib/types";
 import { eur } from "@/lib/utils";
 import { crearPedido } from "../actions";
+import { ShirtPreview } from "@/components/ShirtPreview";
+import { colorDe } from "@/lib/shirt";
 
 export interface PrendaOpt { id: string; nombre_oficial: string; gramaje: number | null; colores: string[] }
 
@@ -160,10 +162,10 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
 
             <div>
               <label>Tallas y unidades</label>
-              <div className="mt-1 grid grid-cols-6 gap-2">
+              <div className="mt-1 grid grid-cols-7 gap-2">
                 {TALLAS.map((t) => (
                   <div key={t} className="text-center">
-                    <span className="text-xs font-semibold text-ink/60">{t}</span>
+                    <span className="text-xs font-semibold text-ink/60">{TALLA_LABEL[t] ?? t}</span>
                     <input type="number" min={0} inputMode="numeric" className="!px-1 text-center" value={l.tallas[t] ?? ""}
                       onChange={(e) => setLinea(i, { tallas: { ...l.tallas, [t]: Math.max(0, Math.floor(Number(e.target.value) || 0)) } })} />
                   </div>
@@ -186,6 +188,8 @@ export function Formulario({ clientes, prendas, clienteInicial }: { clientes: { 
               ))}
               <button className="text-sm font-semibold text-rust" onClick={() => setLinea(i, { zonas: [...l.zonas, { tamano: "normal-pequeno", vista: "espalda" }] })}>+ Otro diseño</button>
             </div>
+
+            <ShirtPreview zonas={l.zonas} color={colorDe(`${prenda?.nombre_oficial ?? ""} ${l.color}`)} className="flex justify-center gap-4 rounded-lg bg-paper p-3" />
 
             <div className="flex items-end justify-between gap-3 rounded-lg bg-paper p-3">
               <div className="w-36">

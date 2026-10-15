@@ -25,15 +25,17 @@ export default async function Tablero() {
         <Link href="/pedidos/nuevo" className="btn">+ Presupuesto</Link>
       </div>
 
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {ESTADOS.map((estado, i) => {
-          const col = pedidos.filter((p) => p.estado === estado);
+          const todos = pedidos.filter((p) => p.estado === estado);
+          // Los entregados se acumulan: aquí solo los más recientes.
+          const col = estado === "entregado" ? todos.slice(0, 6) : todos;
           const ant = ESTADOS[i - 1];
           const sig = ESTADOS[i + 1];
           return (
-            <section key={estado} className="w-72 shrink-0">
-              <h2 className="mb-2 flex items-center justify-between text-sm font-bold uppercase tracking-wide text-ink/60">
-                {ESTADO_LABEL[estado]} <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs">{col.length}</span>
+            <section key={estado} className="min-w-0 rounded-2xl bg-ink/[0.04] p-2.5">
+              <h2 className="mb-2 flex items-center justify-between px-1 text-sm font-bold uppercase tracking-wide text-ink/60">
+                {ESTADO_LABEL[estado]} <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs">{todos.length}</span>
               </h2>
               <div className="space-y-2">
                 {col.map((p) => (
@@ -66,6 +68,7 @@ export default async function Tablero() {
                   </article>
                 ))}
                 {!col.length && <p className="rounded-xl border border-dashed border-ink/15 p-4 text-center text-sm text-ink/40">Vacío</p>}
+                {todos.length > col.length && <p className="text-center text-xs text-ink/40">+{todos.length - col.length} más en el historial</p>}
               </div>
             </section>
           );

@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const LINKS = [
+  { href: "/", label: "Inicio" },
   { href: "/pedidos", label: "Pedidos" },
+  { href: "/tareas", label: "Tareas" },
   { href: "/clientes", label: "Clientes" },
   { href: "/inventario", label: "Inventario" },
   { href: "/inventario/planchar", label: "Planchar" },
@@ -25,7 +27,7 @@ export function Nav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-[1800px] items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/" className="text-lg font-bold tracking-tight">
           camis24h <span className="text-rust">gestión</span>
         </Link>
@@ -34,7 +36,7 @@ export function Nav() {
             <Link
               key={l.href}
               href={l.href}
-              className={cn("rounded-lg px-3 py-1.5", (path === l.href || (l.href === "/pedidos" || l.href === "/clientes" ? path.startsWith(l.href) : false)) ? "bg-rust text-white" : "hover:bg-ink/5")}
+              className={cn("rounded-lg px-3 py-1.5", (path === l.href || (l.href !== "/" && l.href !== "/inventario" && path.startsWith(l.href))) ? "bg-rust text-white" : "hover:bg-ink/5")}
             >
               {l.label}
             </Link>

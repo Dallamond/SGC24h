@@ -6,6 +6,8 @@ import { eur } from "@/lib/utils";
 import { TAMANOS_ZONA } from "@/lib/pricing";
 import { cambiarEstado, marcarPagado } from "../actions";
 import { BotonPdf } from "./BotonPdf";
+import { ShirtPreview } from "@/components/ShirtPreview";
+import { colorDe } from "@/lib/shirt";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +43,15 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             descuento: Number(p.descuento),
             total: Number(p.total),
             notas: p.notas,
+            fechaEntrega: p.fecha_entrega ? new Date(p.fecha_entrega).toLocaleDateString("es-ES") : null,
           }}
         />
       </div>
 
       <div className="card space-y-3">
         {lineas.map((l, i) => (
-          <div key={i} className="border-b border-ink/5 pb-3 last:border-0 last:pb-0">
+          <div key={i} className="flex flex-wrap items-start justify-between gap-3 border-b border-ink/5 pb-3 last:border-0 last:pb-0">
+            <div className="min-w-0 flex-1 basis-60">
             <p className="flex justify-between font-semibold"><span>{l.descripcion}</span><span>{eur(Number(l.precio_unitario) * l.cantidad)}</span></p>
             <p className="text-sm text-ink/60">
               {l.cantidad} uds × {eur(Number(l.precio_unitario))}
@@ -55,6 +59,8 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
               {" · "}{Object.entries(l.tallas).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(" ")}
             </p>
             <p className="text-sm text-ink/60">{l.zonas.map((z) => `${TAMANOS_ZONA[z.tamano].label} (${z.vista})`).join(" · ")}</p>
+            </div>
+            <ShirtPreview zonas={l.zonas} color={colorDe(l.descripcion)} />
           </div>
         ))}
         <div className="space-y-1 pt-1 text-sm">

@@ -17,7 +17,7 @@ export default function NuevaPrenda() {
       <h1 className="text-xl font-bold">Nueva prenda</h1>
       <div><label>Nombre oficial (el de la etiqueta)</label><input name="nombre_oficial" required placeholder="JHK TSRA 190" /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div><label>Tipo</label><select name="tipo"><option value="camiseta">Camiseta</option><option value="sudadera">Sudadera</option><option value="polo">Polo</option><option value="consumible">Consumible</option></select></div>
+        <div><label>Tipo</label><select name="tipo"><option value="camiseta">Camiseta</option><option value="sudadera">Sudadera</option><option value="polo">Polo</option><option value="totebag">Totebag</option><option value="consumible">Consumible</option></select></div>
         <div><label>Gramaje (g/m²)</label><input name="gramaje" type="number" inputMode="numeric" /></div>
         <div><label>Proveedor</label><input name="proveedor" /></div>
         <div><label>Tienda</label><input name="tienda" /></div>

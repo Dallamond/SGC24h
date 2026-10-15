@@ -13,7 +13,8 @@ export const ESTADO_LABEL: Record<Estado, string> = {
   descartado: "Descartados",
 };
 
-export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
+export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "U"] as const;
+export const TALLA_LABEL: Record<string, string> = { U: "Única" };
 
 export interface Cliente {
   id: string;
@@ -47,6 +48,8 @@ export interface Pedido {
   descuento: number;
   total: number;
   pagado: boolean;
+  pagado_en: string | null;
+  entregado_en: string | null;
   metodo_pago: "efectivo" | "bizum" | null;
   anticipo: number;
   validez_dias: number;
