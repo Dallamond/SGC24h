@@ -115,3 +115,48 @@ export async function cargarStockInicial() {
   revalidatePath("/inventario");
   return { ok: true as const };
 }
+
+export interface LineaStockUi {
+  linea_id: string; prenda_id: string; nombre_oficial: string; color: string; talla: string; cantidad: number;
+}
+
+// Líneas de stock para el desplegable de «Planchar».
+export async function listarStock(): Promise<LineaStockUi[]> {
+  const db = await supabaseServer();
+  const { data } = await db.from("sg_v_stock").select("linea_id,prenda_id,nombre_oficial,color,talla,cantidad").eq("activa", true).neq("tipo", "consumible").order("nombre_oficial");
+  return (data ?? []) as LineaStockUi[];
+}
+
+// Recuento real del 15/10/2026 (nota del móvil, 181 prendas). Crea las líneas que falten y fija las cantidades.
+const RECUENTO: { tipo: (typeof TIPOS)[number]; gramaje: number | null; color: string; tallas: Record<string, number> }[] = [
+  { tipo: "camiseta", gramaje: 220, color: "blanco", tallas: { S: 5, M: 10, L: 7, XL: 0 } },
+  { tipo: "camiseta", gramaje: 220, color: "negro", tallas: { S: 0, M: 9, L: 3, XL: 0 } },
+  { tipo: "camiseta", gramaje: 190, color: "negro", tallas: { S: 16, M: 33, L: 10, XL: 5 } },
+  { tipo: "camiseta", gramaje: 190, color: "blanco", tallas: { S: 15, M: 30, L: 14, XL: 5 } },
+  { tipo: "polo", gramaje: null, color: "negro", tallas: { M: 5, L: 5, XL: 2 } },
+  { tipo: "sudadera", gramaje: null, color: "negro", tallas: { M: 3, L: 2 } },
+  { tipo: "sudadera", gramaje: null, color: "blanco", tallas: { L: 2 } },
+];
+
+export async function cargarRecuento() {
+  const db = await supabaseServer();
+  const { data: prendas } = await db.from("sg_prendas").select("id,tipo,gramaje");
+  let aplicadas = 0;
+  for (const r of RECUENTO) {
+    const prenda = prendas?.find((p) => p.tipo === r.tipo && (r.gramaje === null || p.gramaje === r.gramaje));
+    if (!prenda) return { ok: false as const, error: `No existe el modelo ${r.tipo}${r.gramaje ? ` ${r.gramaje} g` : ""}. Carga antes el catálogo base.` };
+    for (const [talla, cantidad] of Object.entries(r.tallas)) {
+      const { data: linea, error } = await db
+        .from("sg_stock_lineas")
+        .upsert({ prenda_id: prenda.id, talla, color: r.color }, { onConflict: "prenda_id,talla,color" })
+        .select("id")
+        .single();
+      if (error) return { ok: false as const, error: error.message };
+      const res = await fijarCantidad(linea.id, cantidad);
+      if (!res.ok) return res;
+      aplicadas++;
+    }
+  }
+  revalidatePath("/", "layout");
+  return { ok: true as const, aplicadas };
+}

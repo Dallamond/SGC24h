@@ -2,7 +2,8 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { eur, cn } from "@/lib/utils";
 import { TALLA_LABEL } from "@/lib/types";
-import { CantidadLinea, CargarInicial, MinimoPrenda, PrecioPrenda } from "./Editores";
+import { CantidadLinea, CargarInicial, CargarRecuento, MinimoPrenda, PrecioPrenda } from "./Editores";
+import { PlancharBoton } from "@/components/PlancharBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function Inventario() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Inventario</h1>
         <div className="flex gap-2">
-          <Link href="/inventario/planchar" className="btn">Planchar</Link>
+          <PlancharBoton />
           <Link href="/inventario/nueva" className="btn-ghost">+ Prenda</Link>
         </div>
       </div>
@@ -46,6 +47,7 @@ export default async function Inventario() {
       </div>
 
       {!filas.length && <CargarInicial />}
+      {filas.length > 0 && unidades === 0 && <CargarRecuento />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {[...prendas.values()].map((lineas) => {

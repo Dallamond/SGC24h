@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { PlancharBoton } from "@/components/PlancharBoton";
 
 const LINKS = [
   { href: "/", label: "Inicio" },
@@ -11,7 +12,6 @@ const LINKS = [
   { href: "/tareas", label: "Tareas" },
   { href: "/clientes", label: "Clientes" },
   { href: "/inventario", label: "Inventario" },
-  { href: "/inventario/planchar", label: "Planchar" },
 ];
 
 export function Nav() {
@@ -41,7 +41,8 @@ export function Nav() {
               {l.label}
             </Link>
           ))}
-          <button onClick={salir} className="ml-2 px-2 py-1.5 text-ink/50 hover:text-rust">
+          <PlancharBoton className="ml-2 !py-1.5" />
+          <button onClick={salir} className="ml-1 px-2 py-1.5 text-ink/50 hover:text-rust">
             Salir
           </button>
         </nav>

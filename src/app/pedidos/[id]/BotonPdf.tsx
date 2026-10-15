@@ -4,7 +4,7 @@ import { useState } from "react";
 import { descargarPdf } from "@/lib/pdf/descargar";
 import type { DatosDocumento } from "@/lib/pdf/Documento";
 
-export function BotonPdf({ datos }: { datos: Omit<DatosDocumento, "logoUrl" | "qrDataUrl" | "web"> }) {
+export function BotonPdf({ datos, imagenes }: { datos: Omit<DatosDocumento, "logoUrl" | "qrDataUrl" | "web" | "imagenes">; imagenes: string[] }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
@@ -12,7 +12,7 @@ export function BotonPdf({ datos }: { datos: Omit<DatosDocumento, "logoUrl" | "q
     setCargando(true);
     setError("");
     try {
-      await descargarPdf(datos);
+      await descargarPdf(datos, imagenes);
     } catch {
       setError("No se pudo generar el PDF");
     }

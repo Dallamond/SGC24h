@@ -4,24 +4,36 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { ESTADO_LABEL, refPedido, type Pedido, type PedidoLinea } from "@/lib/types";
 import { eur } from "@/lib/utils";
 import { TAMANOS_ZONA } from "@/lib/pricing";
+import { colorDe } from "@/lib/shirt";
+import { ShirtPreview } from "@/components/ShirtPreview";
 import { cambiarEstado, marcarPagado } from "../actions";
 import { BotonPdf } from "./BotonPdf";
-import { ShirtPreview } from "@/components/ShirtPreview";
-import { colorDe } from "@/lib/shirt";
+import { Adjuntos, type AdjuntoItem } from "./Adjuntos";
 
 export const dynamic = "force-dynamic";
+
+type LineaDb = PedidoLinea & { coste_unitario: number | null };
+
+const ETIQUETA_TIPO = { solo_estampado: "Solo estampado", servicio: "Servicio" } as const;
 
 export default async function Detalle({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await supabaseServer();
   const { data } = await db.from("sg_pedidos").select("*, sg_clientes(nombre,contacto), sg_pedido_lineas(*)").eq("id", id).maybeSingle();
   if (!data) notFound();
-  const p = data as unknown as Pedido & { sg_clientes: { nombre: string; contacto: string | null } | null; sg_pedido_lineas: PedidoLinea[] };
+  const p = data as unknown as Pedido & { sg_clientes: { nombre: string; contacto: string | null } | null; sg_pedido_lineas: LineaDb[] };
   const lineas = p.sg_pedido_lineas;
   const ref = refPedido(p.numero);
 
-  const coste = lineas.reduce((s, l) => s + Number((l as PedidoLinea & { coste_unitario?: number | null }).coste_unitario ?? 0) * l.cantidad, 0);
-  const sinCoste = lineas.some((l) => !(l as PedidoLinea & { coste_unitario?: number | null }).coste_unitario);
+  const { data: adj } = await db.from("sg_pedido_adjuntos").select("id,path,nombre").eq("pedido_id", id).order("created_at");
+  const { data: firmadas } = adj?.length ? await db.storage.from("adjuntos").createSignedUrls(adj.map((a) => a.path), 3600) : { data: [] };
+  const adjuntos: AdjuntoItem[] = (adj ?? []).flatMap((a, i) => {
+    const url = firmadas?.[i]?.signedUrl;
+    return url ? [{ id: a.id, path: a.path, nombre: a.nombre, url }] : [];
+  });
+
+  const coste = lineas.reduce((s, l) => s + Number(l.coste_unitario ?? 0) * l.cantidad, 0);
+  const sinCoste = lineas.some((l) => l.coste_unitario === null);
 
   return (
     <div className="space-y-5">
@@ -32,6 +44,7 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
           <p className="text-sm text-ink/60">{ESTADO_LABEL[p.estado]} · {new Date(p.created_at).toLocaleDateString("es-ES")}{p.pagado ? ` · pagado (${p.metodo_pago})` : " · sin pagar"}</p>
         </div>
         <BotonPdf
+          imagenes={adjuntos.map((a) => a.url)}
           datos={{
             tipo: "presupuesto",
             referencia: ref,
@@ -52,13 +65,16 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
         {lineas.map((l, i) => (
           <div key={i} className="flex flex-wrap items-start justify-between gap-3 border-b border-ink/5 pb-3 last:border-0 last:pb-0">
             <div className="min-w-0 flex-1 basis-60">
-            <p className="flex justify-between font-semibold"><span>{l.descripcion}</span><span>{eur(Number(l.precio_unitario) * l.cantidad)}</span></p>
-            <p className="text-sm text-ink/60">
-              {l.cantidad} uds × {eur(Number(l.precio_unitario))}
-              {Number(l.precio_unitario) !== Number(l.precio_calculado) && ` (propuesto ${eur(Number(l.precio_calculado))})`}
-              {" · "}{Object.entries(l.tallas).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(" ")}
-            </p>
-            <p className="text-sm text-ink/60">{l.zonas.map((z) => `${TAMANOS_ZONA[z.tamano].label} (${z.vista})`).join(" · ")}</p>
+              <p className="flex justify-between gap-2 font-semibold">
+                <span>{l.tipo && l.tipo !== "prenda" && <span className="mr-2 rounded bg-ink/10 px-1.5 py-0.5 text-xs">{ETIQUETA_TIPO[l.tipo]}</span>}{l.descripcion}</span>
+                <span>{eur(Number(l.precio_unitario) * l.cantidad)}</span>
+              </p>
+              <p className="text-sm text-ink/60">
+                {l.cantidad} uds × {eur(Number(l.precio_unitario))}
+                {Number(l.precio_unitario) !== Number(l.precio_calculado) && Number(l.precio_calculado) > 0 && ` (propuesto ${eur(Number(l.precio_calculado))})`}
+                {Object.keys(l.tallas).length > 0 && " · " + Object.entries(l.tallas).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(" ")}
+              </p>
+              {l.zonas.length > 0 && <p className="text-sm text-ink/60">{l.zonas.map((z) => `${TAMANOS_ZONA[z.tamano].label} (${z.vista})`).join(" · ")}</p>}
             </div>
             <ShirtPreview zonas={l.zonas} color={colorDe(l.descripcion)} />
           </div>
@@ -67,14 +83,17 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
           {Number(p.envio) > 0 && <p className="flex justify-between"><span>Envío</span><span>{eur(Number(p.envio))}</span></p>}
           {Number(p.descuento) > 0 && <p className="flex justify-between"><span>Descuento</span><span>−{eur(Number(p.descuento))}</span></p>}
           <p className="flex justify-between text-lg font-bold"><span>Total</span><span>{eur(Number(p.total))}</span></p>
-          {coste > 0 && (
+          {lineas.some((l) => l.coste_unitario !== null) && (
             <p className="flex justify-between text-ink/60">
               <span>Beneficio estimado{sinCoste ? " (faltan costes)" : ""}</span><span>{eur(Number(p.total) - coste)}</span>
             </p>
           )}
         </div>
         {p.notas && <p className="rounded-lg bg-ink/5 p-3 text-sm">{p.notas}</p>}
+        {p.stock_descontado && <p className="text-xs font-semibold text-sage-dark">✓ Stock descontado del inventario</p>}
       </div>
+
+      <Adjuntos pedidoId={id} items={adjuntos} />
 
       <div className="flex flex-wrap gap-2">
         {!p.pagado && (

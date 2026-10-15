@@ -8,7 +8,8 @@ Supabase propio, en otra cuenta distinta a la de la web (no comparten BD).
 - Tareas con fecha límite y completar. Tablero a ancho completo sin scroll horizontal.
 - Inventario agrupado por modelo con recuento editable, precio y mínimo; botón «Cargar catálogo base» (camisetas 220/190, sudaderas, polos, totebags).
 - PDF maquetado con cabecera, datos, camisetas con las zonas de estampado (delante/espalda) y totales.
-- Migración `0002_tareas_stats_totebag.sql` (ejecutar antes de desplegar).
+- Migraciones `0002_tareas_stats_totebag.sql` y `0003_stock_auto_adjuntos.sql` (ejecutar antes de desplegar).
+- v3: botón verde «Planchar» (desplegable) en barra, inicio e inventario; descuento automático de stock al pasar un pedido a «Listos» (reversible); KPI camisetas vendidas; líneas «solo estampado» y «servicio»; imágenes adjuntas (mockups) en pedido y PDF; logo blanco en cabecera del PDF; botón «Cargar recuento del 15/10».
 
 ## Hecho (v1)
 - Base: Next 15 + Supabase (auth) + Tailwind, paleta de Camis24h. Esquema en `supabase/migrations/0001_init.sql`.

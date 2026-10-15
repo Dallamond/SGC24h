@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { NumeroEditable } from "@/components/NumeroEditable";
-import { cargarStockInicial, fijarCantidad, fijarMinimo, fijarPrecio } from "./actions";
+import { cargarRecuento, cargarStockInicial, fijarCantidad, fijarMinimo, fijarPrecio } from "./actions";
 
 export const CantidadLinea = ({ lineaId, cantidad, etiqueta }: { lineaId: string; cantidad: number; etiqueta: string }) => (
   <NumeroEditable etiqueta={etiqueta} valor={cantidad} className="w-16" onGuardar={(n) => fijarCantidad(lineaId, Math.floor(n))} />
@@ -30,6 +30,24 @@ export function CargarInicial() {
         {pendiente ? "Cargando…" : "Cargar catálogo base"}
       </button>
       {error && <p className="text-sm text-rust-dark">{error}</p>}
+    </div>
+  );
+}
+
+export function CargarRecuento() {
+  const [msg, setMsg] = useState<{ texto: string; error?: boolean } | null>(null);
+  const [pendiente, start] = useTransition();
+  return (
+    <div className="card space-y-3 text-center">
+      <p className="font-semibold">Hay modelos pero todo está a 0 unidades</p>
+      <p className="text-sm text-ink/60">Puedo cargar el recuento real del 15/10/2026 (181 prendas: 162 camisetas, 12 polos y 7 sudaderas).</p>
+      <button className="btn" disabled={pendiente} onClick={() => start(async () => {
+        const r = await cargarRecuento();
+        setMsg(r.ok ? { texto: `Cargadas ${r.aplicadas} líneas de stock` } : { texto: r.error, error: true });
+      })}>
+        {pendiente ? "Cargando…" : "Cargar recuento del 15/10"}
+      </button>
+      {msg && <p className={msg.error ? "text-sm text-rust-dark" : "text-sm text-sage-dark"}>{msg.texto}</p>}
     </div>
   );
 }

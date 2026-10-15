@@ -16,6 +16,13 @@ describe("resumir", () => {
     expect(r.margenMes).toBe(60);
     expect(r.porCobrar).toBe(50);
     expect(r.ticketMedio).toBe(75);
+    expect(r.udsMes).toBe(10);
+  });
+
+  it("cuenta las prendas vendidas del mes y en total", () => {
+    const r = resumir([base, { ...base, created_at: "2026-08-02T10:00:00Z", uds: 7 }, { ...base, estado: "posible", uds: 99 }], ahora);
+    expect(r.udsMes).toBe(5);
+    expect(r.udsTotal).toBe(12);
   });
 
   it("los posibles y descartados no cuentan como venta", () => {

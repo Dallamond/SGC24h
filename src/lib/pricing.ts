@@ -69,3 +69,14 @@ export function calcularPrecio(zonas: ZonaPedido[], cantidad: number): PrecioLin
     precioTotal: redondear(precioUnitario * uds),
   };
 }
+
+// Solo estampado (el cliente trae la prenda): precio sugerido = precio con prenda − lo que cuesta/vale la prenda.
+// ⚠️ Valor PROVISIONAL, sin validar con Nasser (la prenda cuesta ~6,44 € a coste). Siempre se puede corregir a mano.
+export const AHORRO_PRENDA_PROPIA = 6;
+
+export function calcularSoloEstampado(zonas: ZonaPedido[], cantidad: number): number {
+  const conPrenda = calcularPrecio(zonas, cantidad).precioUnitario;
+  return Math.max(0, redondear(conPrenda - AHORRO_PRENDA_PROPIA));
+}
+
+export const SERVICIOS_SUGERIDOS = ["Digitalización de diseño", "Diseño desde cero", "Retoque / quitar fondo", "Maquetación de plancha"];

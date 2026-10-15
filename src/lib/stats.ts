@@ -24,6 +24,7 @@ export interface Resumen {
   margenMes: number | null; // %
   ticketMedio: number | null;
   udsMes: number;
+  udsTotal: number;         // prendas vendidas desde el principio
   aceptacion: number | null; // % de presupuestos resueltos que se aceptaron
   porMes: { mes: string; etiqueta: string; vendido: number }[]; // últimos 6 meses
   topClientes: { id: string; nombre: string; total: number; pedidos: number }[];
@@ -85,6 +86,7 @@ export function resumir(pedidos: PedidoStat[], ahora = new Date()): Resumen {
     margenMes: ingresoConCoste > 0 ? (beneficioMes / ingresoConCoste) * 100 : null,
     ticketMedio: delMes.length ? vendidoMes / delMes.length : null,
     udsMes: delMes.reduce((s, p) => s + p.uds, 0),
+    udsTotal: aceptados.reduce((s, p) => s + p.uds, 0),
     aceptacion: resueltos.length ? (aceptados.length / resueltos.length) * 100 : null,
     porMes: meses,
     topClientes: [...porCliente.values()].sort((a, b) => b.total - a.total).slice(0, 5),

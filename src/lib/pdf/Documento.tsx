@@ -15,6 +15,7 @@ export interface DatosDocumento {
   total: number;
   notas?: string | null;
   fechaEntrega?: string | null;
+  imagenes?: string[]; // mockups / referencias (data URLs)
   logoUrl: string;
   qrDataUrl: string;
   web: string;
@@ -160,6 +161,17 @@ export function Documento(d: DatosDocumento) {
             <View style={s.notas} wrap={false}>
               <Text style={s.etiqueta}>Notas</Text>
               <Text>{d.notas}</Text>
+            </View>
+          ) : null}
+
+          {d.imagenes?.length ? (
+            <View style={{ marginTop: 18 }} wrap={false}>
+              <Text style={s.etiqueta}>Mockup / referencias</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {d.imagenes.map((src, i) => (
+                  <Image key={i} src={src} style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 4 }} />
+                ))}
+              </View>
             </View>
           ) : null}
         </View>

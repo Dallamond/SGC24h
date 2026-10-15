@@ -4,6 +4,7 @@ import { resumir, type PedidoStat } from "@/lib/stats";
 import { ESTADO_LABEL, refPedido, type Estado } from "@/lib/types";
 import { eur, cn } from "@/lib/utils";
 import { completarTarea } from "./tareas/actions";
+import { PlancharBoton } from "@/components/PlancharBoton";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ interface FilaPedido {
   id: string; numero: number; estado: Estado; total: number; pagado: boolean; pagado_en: string | null; created_at: string;
   fecha_entrega: string | null; cliente_id: string | null;
   sg_clientes: { nombre: string } | null;
-  sg_pedido_lineas: { cantidad: number; coste_unitario: number | null }[];
+  sg_pedido_lineas: { tipo: string; cantidad: number; coste_unitario: number | null }[];
 }
 
 function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?: string; tono?: "bueno" | "malo" }) {
@@ -27,7 +28,7 @@ function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?
 export default async function Inicio() {
   const db = await supabaseServer();
   const [{ data: ped, error }, { data: stock }, { data: tareas }] = await Promise.all([
-    db.from("sg_pedidos").select("id,numero,estado,total,pagado,pagado_en,created_at,fecha_entrega,cliente_id, sg_clientes(nombre), sg_pedido_lineas(cantidad,coste_unitario)"),
+    db.from("sg_pedidos").select("id,numero,estado,total,pagado,pagado_en,created_at,fecha_entrega,cliente_id, sg_clientes(nombre), sg_pedido_lineas(tipo,cantidad,coste_unitario)"),
     db.from("sg_v_stock").select("valor,cantidad,reponer,tipo").eq("activa", true),
     db.from("sg_tareas").select("id,texto,vence").eq("completada", false).order("vence", { ascending: true, nullsFirst: false }).limit(6),
   ]);
@@ -37,9 +38,10 @@ export default async function Inicio() {
   const stats: PedidoStat[] = filas.map((p) => ({
     estado: p.estado, total: Number(p.total), pagado: p.pagado, pagado_en: p.pagado_en, created_at: p.created_at,
     fecha_entrega: p.fecha_entrega, cliente_id: p.cliente_id, cliente: p.sg_clientes?.nombre ?? null,
-    uds: p.sg_pedido_lineas.reduce((s, l) => s + l.cantidad, 0),
+    // Cuentan las prendas estampadas (nuestras o del cliente); los servicios no son prendas.
+    uds: p.sg_pedido_lineas.filter((l) => l.tipo !== "servicio").reduce((s, l) => s + l.cantidad, 0),
     coste: p.sg_pedido_lineas.reduce((s, l) => s + Number(l.coste_unitario ?? 0) * l.cantidad, 0),
-    sinCoste: p.sg_pedido_lineas.some((l) => !l.coste_unitario),
+    sinCoste: p.sg_pedido_lineas.some((l) => l.coste_unitario === null),
   }));
   const r = resumir(stats);
   const porId = new Map(filas.map((p, i) => [stats[i], p]));
@@ -60,12 +62,13 @@ export default async function Inicio() {
         </div>
         <div className="flex gap-2">
           <Link href="/pedidos/nuevo" className="btn">+ Presupuesto</Link>
-          <Link href="/inventario/planchar" className="btn-ghost">Planchar</Link>
+          <PlancharBoton />
         </div>
       </div>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-6">
-        <Kpi titulo={`Vendido en ${mesNombre}`} valor={eur(r.vendidoMes)} sub={`${r.udsMes} prendas${r.ticketMedio ? ` · ticket ${eur(r.ticketMedio)}` : ""}`} />
+        <Kpi titulo={`Vendido en ${mesNombre}`} valor={eur(r.vendidoMes)} sub={r.ticketMedio ? `ticket medio ${eur(r.ticketMedio)}` : undefined} />
+        <Kpi titulo="Camisetas vendidas" valor={String(r.udsMes)} sub={`este mes · ${r.udsTotal} en total`} />
         <Kpi titulo="Cobrado este mes" valor={eur(r.cobradoMes)} tono="bueno" />
         <Kpi titulo="Por cobrar" valor={eur(r.porCobrar)} tono={r.porCobrar > 0 ? "malo" : undefined} sub="pedidos aceptados sin pagar" />
         <Kpi titulo="Beneficio estimado" valor={eur(r.beneficioMes)} sub={r.margenMes === null ? "faltan costes de prenda" : `margen ${r.margenMes.toFixed(0)} %`} />

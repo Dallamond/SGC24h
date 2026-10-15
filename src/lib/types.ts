@@ -25,9 +25,14 @@ export interface Cliente {
   notas: string | null;
 }
 
+// prenda = nuestra prenda · solo_estampado = la trae el cliente · servicio = digitalización, diseño…
+export type TipoLinea = "prenda" | "solo_estampado" | "servicio";
+
 export interface PedidoLinea {
   id?: string;
+  tipo?: TipoLinea;
   prenda_id: string | null;
+  color?: string | null;
   descripcion: string;
   tallas: Record<string, number>;
   cantidad: number;
@@ -54,6 +59,7 @@ export interface Pedido {
   anticipo: number;
   validez_dias: number;
   notas: string | null;
+  stock_descontado: boolean;
 }
 
 export const refPedido = (n: number) => `C24H-${String(n).padStart(4, "0")}`;
