@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const LINKS = [
+  { href: "/pedidos", label: "Pedidos" },
+  { href: "/clientes", label: "Clientes" },
   { href: "/inventario", label: "Inventario" },
   { href: "/inventario/planchar", label: "Planchar" },
 ];
@@ -32,7 +34,7 @@ export function Nav() {
             <Link
               key={l.href}
               href={l.href}
-              className={cn("rounded-lg px-3 py-1.5", path === l.href ? "bg-rust text-white" : "hover:bg-ink/5")}
+              className={cn("rounded-lg px-3 py-1.5", (path === l.href || (l.href === "/pedidos" || l.href === "/clientes" ? path.startsWith(l.href) : false)) ? "bg-rust text-white" : "hover:bg-ink/5")}
             >
               {l.label}
             </Link>
