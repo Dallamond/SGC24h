@@ -32,7 +32,7 @@ export async function generarPdf(d: Datos, urlsImagenes: string[] = []): Promise
   const blob = await pdf(
     Documento({ ...d, logoUrl, qrDataUrl, web: WEB_CAMIS24H, imagenes: imagenes.filter((x): x is string => !!x) }),
   ).toBlob();
-  return { blob, nombre: `${d.tipo === "factura" ? "Factura" : "Presupuesto"}-${d.referencia}.pdf` };
+  return { blob, nombre: `${d.tipo === "factura" ? "Factura" : d.tipo === "recibo" ? "Recibo" : "Presupuesto"}-${d.referencia}.pdf` };
 }
 
 export function descargarBlob(blob: Blob, nombre: string) {

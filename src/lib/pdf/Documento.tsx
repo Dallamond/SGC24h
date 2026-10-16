@@ -2,9 +2,10 @@ import { Document, G, Image, Page, Path, Rect, StyleSheet, Svg, Text, View } fro
 import { TAMANOS_ZONA } from "@/lib/pricing";
 import { COLOR_FILL, SHIRT_BODY, SHIRT_COLLAR, SHIRT_MATRIX, SHIRT_SEAMS, SHIRT_VIEWBOX, ZONA_RECT, colorDe, zonasDe } from "@/lib/shirt";
 import type { PedidoLinea } from "@/lib/types";
+import { desglosarLinea } from "@/lib/desglose";
 
 export interface DatosDocumento {
-  tipo: "presupuesto" | "factura";
+  tipo: "presupuesto" | "factura" | "recibo";
   referencia: string;
   fecha: string; // DD/MM/AAAA
   validezDias?: number;
@@ -15,6 +16,7 @@ export interface DatosDocumento {
   total: number;
   notas?: string | null;
   fechaEntrega?: string | null;
+  pagos?: { fecha: string; metodo: string; importe: number }[]; // cobros registrados (recibo)
   imagenes?: string[]; // mockups / referencias (data URLs)
   logoUrl: string;
   qrDataUrl: string;
@@ -55,6 +57,7 @@ const s = StyleSheet.create({
 });
 
 const eur = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
+const eurSigno = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${eur(Math.abs(n))}`;
 
 const textoTallas = (t: Record<string, number>) =>
   Object.entries(t).filter(([, n]) => n > 0).map(([k, n]) => `${k} × ${n}`).join("   ");
@@ -80,11 +83,15 @@ function Camiseta({ linea, vista }: { linea: PedidoLinea; vista: "delante" | "es
 }
 
 export function Documento(d: DatosDocumento) {
+  const esRecibo = d.tipo === "recibo";
   const esFactura = d.tipo === "factura";
+  const nombreDoc = esRecibo ? "Recibo" : esFactura ? "Factura" : "Presupuesto";
+  const pagado = (d.pagos ?? []).reduce((a, p) => a + p.importe, 0);
+  const pendiente = Math.max(0, Math.round((d.total - pagado) * 100) / 100);
   const subtotal = d.lineas.reduce((a, l) => a + l.precio_unitario * l.cantidad, 0);
 
   return (
-    <Document title={`${esFactura ? "Factura" : "Presupuesto"} ${d.referencia}`} author="Camis24h">
+    <Document title={`${nombreDoc} ${d.referencia}`} author="Camis24h">
       <Page size="A4" style={s.page}>
         <View style={s.banda} fixed>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -96,7 +103,7 @@ export function Documento(d: DatosDocumento) {
             </View>
           </View>
           <View>
-            <Text style={s.tipo}>{esFactura ? "FACTURA" : "PRESUPUESTO"}</Text>
+            <Text style={s.tipo}>{nombreDoc.toUpperCase()}</Text>
             <Text style={s.tipoSub}>Nº {d.referencia}</Text>
           </View>
         </View>
@@ -111,7 +118,7 @@ export function Documento(d: DatosDocumento) {
             <View style={s.caja}>
               <Text style={s.etiqueta}>Fecha</Text>
               <Text style={s.fuerte}>{d.fecha}</Text>
-              {!esFactura && d.validezDias ? <Text style={s.sub}>Válido durante {d.validezDias} días</Text> : null}
+              {!esFactura && !esRecibo && d.validezDias ? <Text style={s.sub}>Válido durante {d.validezDias} días</Text> : null}
             </View>
             {d.fechaEntrega ? (
               <View style={s.caja}>
@@ -139,6 +146,17 @@ export function Documento(d: DatosDocumento) {
                     • {TAMANOS_ZONA[z.tamano].label} · {TAMANOS_ZONA[z.tamano].medida} ({z.vista})
                   </Text>
                 ))}
+                {esRecibo && desglosarLinea(l).length > 0 ? (
+                  <View style={{ marginTop: 5, paddingTop: 4, borderTopWidth: 0.5, borderTopColor: C.linea }}>
+                    <Text style={[s.etiqueta, { marginBottom: 2 }]}>Cómo se compone el precio por unidad</Text>
+                    {desglosarLinea(l).map((r, k) => (
+                      <View key={k} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 1 }}>
+                        <Text style={{ fontSize: 8, color: C.gris, flex: 1, paddingRight: 6 }}>{r.concepto}</Text>
+                        <Text style={{ fontSize: 8 }}>{r.importe === null ? "incluido" : k === 0 ? eur(r.importe) : eurSigno(r.importe)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
               <View style={s.cCamis}>
                 {zonasDe(l.zonas, "delante").length > 0 && <Camiseta linea={l} vista="delante" />}
@@ -156,6 +174,23 @@ export function Documento(d: DatosDocumento) {
             {d.descuento > 0 ? <View style={s.tFila}><Text>Descuento</Text><Text>−{eur(d.descuento)}</Text></View> : null}
             <View style={s.tTotal}><Text>TOTAL</Text><Text>{eur(d.total)}</Text></View>
           </View>
+
+          {esRecibo ? (
+            <View style={{ marginTop: 16, flexDirection: "row", gap: 12 }} wrap={false}>
+              <View style={[s.caja, { flex: 2 }]}>
+                <Text style={s.etiqueta}>Pagos recibidos</Text>
+                {(d.pagos ?? []).length ? (d.pagos ?? []).map((p, i) => (
+                  <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.5 }}>
+                    <Text>{p.fecha} · {p.metodo}</Text><Text style={{ fontFamily: "Helvetica-Bold" }}>{eur(p.importe)}</Text>
+                  </View>
+                )) : <Text style={s.sub}>Sin pagos registrados</Text>}
+              </View>
+              <View style={[s.caja, { alignItems: "center", justifyContent: "center", backgroundColor: pendiente > 0 ? "#fdf0d5" : "#dfeadf" }]}>
+                <Text style={[s.fuerte, { fontSize: 15, color: pendiente > 0 ? "#8a5a00" : "#2f5a3d" }]}>{pendiente > 0 ? "PENDIENTE" : "PAGADO"}</Text>
+                <Text style={s.sub}>{pendiente > 0 ? `Faltan ${eur(pendiente)}` : `${eur(pagado)} cobrados`}</Text>
+              </View>
+            </View>
+          ) : null}
 
           {d.notas ? (
             <View style={s.notas} wrap={false}>
@@ -179,7 +214,9 @@ export function Documento(d: DatosDocumento) {
         <View style={s.pie} fixed>
           <View>
             <Text style={s.peq}>
-              {esFactura
+              {esRecibo
+                ? "Justificante de pago de Camis24h. Documento informativo sin validez fiscal."
+                : esFactura
                 ? "Documento comercial interno. No válido como factura fiscal hasta el alta de la actividad."
                 : "Pago en efectivo o Bizum. Impresión DTF incluida en el precio. Presupuesto sujeto a la revisión final del diseño."}
             </Text>

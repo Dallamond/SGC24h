@@ -8,6 +8,8 @@ Supabase propio, en otra cuenta distinta a la de la web (no comparten BD).
 - Foto por modelo de prenda en Inventario (cámara/galería) y al crear prenda. Migración `0005_imagen_prenda.sql` (ejecutar antes de usar fotos).
 - Calculadora (`/calculadora`): prenda del inventario + medidas DTF → coste de producción, tarifa oficial, mínimo por margen y precio recomendado. Botón «Crear presupuesto con esto» que abre el formulario con prenda, zonas, unidades y precio. Parámetros editables (lámina 10 €/5.500 cm², aprovechamiento 85 %, planchado 0,50 €, margen 50 %).
 
+- Recibo de pago en PDF (ficha del pedido → Cobros): pagos recibidos con fecha y método, PAGADO/PENDIENTE y desglose del precio por unidad (prenda + impresión base, recargo de cada zona, estampados adicionales, ajuste acordado). Sin validez fiscal. Logo en el Inicio.
+
 ## Hecho (v2 · 15/10/2026 noche)
 - Inicio con KPIs (vendido, cobrado, por cobrar, beneficio estimado, aceptación), ventas 6 meses, entregas, mejores clientes, tareas e inventario.
 - Tareas con fecha límite y completar. Tablero a ancho completo sin scroll horizontal.

@@ -32,3 +32,26 @@ describe("Documento PDF", () => {
     if (process.env.PDF_OUT) writeFileSync(process.env.PDF_OUT, buf);
   });
 });
+
+describe("Recibo PDF", () => {
+  it("genera un recibo con desglose y pagos", async () => {
+    const buf = await renderToBuffer(
+      Documento({
+        tipo: "recibo",
+        referencia: "C24H-0002",
+        fecha: "16/10/2026",
+        cliente: { nombre: "Cliente de prueba" },
+        lineas: [
+          { prenda_id: null, descripcion: "Camiseta 220 g · negro", tallas: { M: 2 }, cantidad: 2, zonas: [{ tamano: "normal-grande", vista: "delante" }, { tamano: "masivo", vista: "espalda" }], precio_unitario: 21.25, precio_calculado: 21.25 },
+        ],
+        envio: 0, descuento: 0, total: 42.5,
+        pagos: [{ fecha: "10/10/2026", metodo: "Bizum", importe: 20 }, { fecha: "16/10/2026", metodo: "Efectivo", importe: 22.5 }],
+        logoUrl: path.resolve("public/logo-blanco.png"),
+        qrDataUrl: await QR.toDataURL("https://camis24h.store"),
+        web: "https://camis24h.store",
+      }),
+    );
+    expect(buf.subarray(0, 4).toString()).toBe("%PDF");
+    if (process.env.PDF_OUT) writeFileSync(process.env.PDF_OUT.replace(".pdf", "-recibo.pdf"), buf);
+  });
+});

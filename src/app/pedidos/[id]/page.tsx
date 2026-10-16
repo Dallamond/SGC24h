@@ -8,6 +8,7 @@ import { colorDe } from "@/lib/shirt";
 import { ShirtPreview } from "@/components/ShirtPreview";
 import { borrarPago, cambiarEstado, marcarPagado, registrarPago } from "../actions";
 import { BotonPdf } from "./BotonPdf";
+import { BotonRecibo } from "./BotonRecibo";
 import { Adjuntos, type AdjuntoItem } from "./Adjuntos";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,22 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
               </li>
             ))}
           </ul>
+        )}
+        {pagos.length > 0 && (
+          <BotonRecibo
+            datos={{
+              tipo: "recibo",
+              referencia: ref,
+              fecha: new Date().toLocaleDateString("es-ES"),
+              cliente: { nombre: p.sg_clientes?.nombre ?? "—", contacto: p.sg_clientes?.contacto },
+              lineas,
+              envio: Number(p.envio),
+              descuento: Number(p.descuento),
+              total: Number(p.total),
+              notas: null,
+              pagos: pagos.map((x) => ({ fecha: new Date(x.fecha).toLocaleDateString("es-ES"), metodo: x.metodo === "bizum" ? "Bizum" : "Efectivo", importe: Number(x.importe) })),
+            }}
+          />
         )}
         {resto > 0 && (
           <form action={cobrar} className="flex flex-wrap items-end gap-2">

@@ -79,8 +79,10 @@ export default async function Inicio() {
   return (
     <div className="space-y-5 md:space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Inicio</h1>
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Camis24h" className="-my-3 -ml-2 h-24 w-24 shrink-0 object-contain md:h-28 md:w-28" />
+          <h1 className="sr-only">Inicio</h1>
           <p className="text-sm capitalize text-ink/50">{new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</p>
         </div>
         <div className="flex gap-2">
