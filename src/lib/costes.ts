@@ -85,3 +85,21 @@ export function calcularCoste(e: EntradaCoste, p: ParamsCoste = PARAMS_POR_DEFEC
     tarifaBaja: tarifaUd !== null && tarifaUd < minimoUd,
   };
 }
+
+export interface LineaCoste {
+  tipo?: "prenda" | "solo_estampado" | "servicio";
+  cantidad: number;
+  zonas: { tamano: TamanoZona }[];
+  coste_unitario: number | null; // coste de la prenda guardado en el pedido (null = desconocido)
+}
+
+/**
+ * Coste real de producción de una línea de pedido: prenda + lámina DTF de cada zona + planchado.
+ * `conocido` es false si no se sabe lo que costó la prenda.
+ */
+export function costeRealLinea(l: LineaCoste, p: ParamsCoste = PARAMS_POR_DEFECTO): { total: number; conocido: boolean } {
+  if (l.tipo === "servicio") return { total: r2(Number(l.coste_unitario ?? 0) * l.cantidad), conocido: true };
+  const dtf = l.zonas.reduce((s, z) => s + costeDtf(medidaZona(z.tamano), p), 0);
+  const ud = Number(l.coste_unitario ?? 0) + dtf + p.planchadoEur;
+  return { total: r2(ud * l.cantidad), conocido: l.coste_unitario !== null };
+}

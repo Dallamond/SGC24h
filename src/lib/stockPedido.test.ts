@@ -37,3 +37,14 @@ describe("planificarDescuento", () => {
     expect(r.faltas).toHaveLength(2);
   });
 });
+
+import { preverFaltas } from "./stockPedido";
+
+describe("preverFaltas", () => {
+  it("suma la demanda de varios pedidos y avisa de lo que no llega", () => {
+    const stock = [{ id: "s1", prenda_id: "p", talla: "M", color: "negro", cantidad: 3, nombre_oficial: "Camiseta 190" }];
+    const f = preverFaltas([{ prenda_id: "p", color: "Negro", tallas: { M: 2 } }, { prenda_id: "p", color: "negro", tallas: { M: 4 } }], stock);
+    expect(f).toEqual([{ nombre: "Camiseta 190", color: "negro", talla: "M", necesito: 6, hay: 3, falta: 3 }]);
+    expect(preverFaltas([{ prenda_id: "p", color: "negro", tallas: { M: 3 } }], stock)).toEqual([]);
+  });
+});

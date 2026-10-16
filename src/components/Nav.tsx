@@ -50,8 +50,8 @@ export function Nav() {
   };
 
   const tab = (href: string, label: string, icono: keyof typeof ICONOS) => (
-    <Link href={href} className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold", activo(path, href) ? "text-rust" : "text-ink/45")}>
-      <Icono d={ICONOS[icono]} />
+    <Link href={href} className={cn("group flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition active:scale-90", activo(path, href) ? "text-rust" : "text-ink/45")}>
+      <span className={cn("transition-transform duration-300", activo(path, href) && "-translate-y-0.5 scale-110")}><Icono d={ICONOS[icono]} /></span>
       {label}
     </Link>
   );
@@ -60,14 +60,14 @@ export function Nav() {
   return (
     <>
       {/* Cabecera: en escritorio con todos los enlaces, en móvil solo la marca */}
-      <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-ink/[0.06] bg-paper/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <Link href="/" className="text-lg font-bold tracking-tight">
             camis24h <span className="text-rust">gestión</span>
           </Link>
           <nav className="hidden flex-wrap items-center justify-end gap-1 text-sm font-semibold md:flex">
             {LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className={cn("rounded-lg px-3 py-1.5", activo(path, l.href) ? "bg-rust text-white" : "hover:bg-ink/5")}>
+              <Link key={l.href} href={l.href} className={cn("rounded-xl px-3 py-1.5 transition duration-200", activo(path, l.href) ? "bg-rust text-white shadow-sm shadow-rust/30" : "hover:bg-ink/5")}>
                 {l.label}
               </Link>
             ))}
@@ -80,12 +80,12 @@ export function Nav() {
       </header>
 
       {/* Móvil: barra inferior con Planchar en el centro */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Principal">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/[0.06] bg-paper/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden" aria-label="Principal">
         <div className="flex items-end px-1">
           {tab("/", "Inicio", "inicio")}
           {tab("/pedidos", "Pedidos", "pedidos")}
           <div className="flex flex-1 justify-center pb-2">
-            <PlancharBoton className="-mt-5 !h-14 !w-14 !rounded-full !p-0 shadow-lg" icono={<Icono d={ICONOS.planchar} />} />
+            <PlancharBoton className="-mt-5 !h-14 !w-14 animate-pulse-ring !rounded-full !p-0 shadow-lg" icono={<Icono d={ICONOS.planchar} />} />
           </div>
           {tab("/inventario", "Stock", "inventario")}
           <button onClick={() => setMas((v) => !v)} className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold", mas || masActivo ? "text-rust" : "text-ink/45")}>

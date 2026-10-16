@@ -72,3 +72,12 @@ describe("resumir", () => {
     expect(r.topClientes[0]).toMatchObject({ nombre: "Ana", total: 130, pedidos: 2 });
   });
 });
+
+describe("mes anterior", () => {
+  it("separa lo vendido el mes pasado para las tendencias", () => {
+    const p = (created_at: string, total: number) => ({ estado: "entregado" as const, total, cobrado: total, created_at, fecha_entrega: null, cliente_id: null, cliente: null, uds: 2, coste: 10, sinCoste: false });
+    const r = resumir([p("2026-09-10T10:00:00Z", 100), p("2026-10-05T10:00:00Z", 150)], new Date("2026-10-16T12:00:00Z"));
+    expect(r.anterior).toMatchObject({ vendido: 100, uds: 2, beneficio: 90 });
+    expect(r.vendidoMes).toBe(150);
+  });
+});

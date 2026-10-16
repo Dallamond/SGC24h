@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { ESTADO_LABEL, refPedido, type Pedido, type PedidoLinea } from "@/lib/types";
 import { eur } from "@/lib/utils";
 import { TAMANOS_ZONA } from "@/lib/pricing";
+import { costeRealLinea } from "@/lib/costes";
 import { colorDe } from "@/lib/shirt";
 import { ShirtPreview } from "@/components/ShirtPreview";
 import { borrarPago, cambiarEstado, marcarPagado, registrarPago } from "../actions";
@@ -33,7 +34,8 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
     return url ? [{ id: a.id, path: a.path, nombre: a.nombre, url }] : [];
   });
 
-  const coste = lineas.reduce((s, l) => s + Number(l.coste_unitario ?? 0) * l.cantidad, 0);
+  // Coste real: prenda + lámina DTF de cada zona + planchado.
+  const coste = lineas.reduce((s, l) => s + costeRealLinea(l).total, 0);
   const sinCoste = lineas.some((l) => l.coste_unitario === null);
 
   const { data: pagosDb, error: errPagos } = await db.from("sg_pagos").select("id,importe,metodo,fecha").eq("pedido_id", id).order("fecha").order("created_at");
@@ -98,7 +100,7 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
           <p className="flex justify-between text-lg font-bold"><span>Total</span><span>{eur(Number(p.total))}</span></p>
           {lineas.some((l) => l.coste_unitario !== null) && (
             <p className="flex justify-between text-ink/60">
-              <span>Beneficio estimado{sinCoste ? " (faltan costes)" : ""}</span><span>{eur(Number(p.total) - coste)}</span>
+              <span>Beneficio real{sinCoste ? " (faltan costes)" : ""} <span className="text-xs text-ink/40">· con lámina y planchado</span></span><span>{eur(Number(p.total) - coste)}</span>
             </p>
           )}
         </div>

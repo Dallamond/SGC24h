@@ -32,3 +32,17 @@ describe("costes", () => {
     expect(calcularCoste({ precioPrenda: 5, disenos: [], unidades: 2 }).tarifaUd).toBeNull();
   });
 });
+
+import { costeRealLinea } from "./costes";
+
+describe("costeRealLinea", () => {
+  it("suma prenda + lámina + planchado por unidad", () => {
+    const r = costeRealLinea({ tipo: "prenda", cantidad: 2, zonas: [{ tamano: "normal-grande" }], coste_unitario: 6.44 });
+    expect(r.conocido).toBe(true);
+    expect(r.total).toBeCloseTo(2 * 7.74, 1);
+  });
+  it("desconocido si no hay coste de prenda; servicio sin lámina", () => {
+    expect(costeRealLinea({ tipo: "prenda", cantidad: 1, zonas: [], coste_unitario: null }).conocido).toBe(false);
+    expect(costeRealLinea({ tipo: "servicio", cantidad: 1, zonas: [], coste_unitario: 0 }).total).toBe(0);
+  });
+});

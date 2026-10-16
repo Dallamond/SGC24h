@@ -10,6 +10,8 @@ Supabase propio, en otra cuenta distinta a la de la web (no comparten BD).
 
 - Recibo de pago en PDF (ficha del pedido → Cobros): pagos recibidos con fecha y método, PAGADO/PENDIENTE y desglose del precio por unidad (prenda + impresión base, recargo de cada zona, estampados adicionales, ajuste acordado). Sin validez fiscal. Logo en el Inicio.
 
+- v7: Inicio renovado (cifras animadas, tarjeta destacada, flechas verde/roja vs mes pasado en ventas, cobros, camisetas, gastos y beneficio), animaciones en botones/tarjetas/gráfica, beneficio real (prenda + lámina por zona + planchado), aviso de falta de stock para pedidos en curso y recordatorio de copia de seguridad (>7 días, por dispositivo).
+
 ## Hecho (v2 · 15/10/2026 noche)
 - Inicio con KPIs (vendido, cobrado, por cobrar, beneficio estimado, aceptación), ventas 6 meses, entregas, mejores clientes, tareas e inventario.
 - Tareas con fecha límite y completar. Tablero a ancho completo sin scroll horizontal.

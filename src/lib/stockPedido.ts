@@ -51,3 +51,25 @@ export function planificarDescuento(lineas: LineaNecesidad[], stock: LineaStock[
 
   return { movimientos: [...acumulado].map(([linea_id, unidades]) => ({ linea_id, unidades })), faltas };
 }
+
+export interface Prevision { nombre: string; color: string; talla: string; necesito: number; hay: number; falta: number }
+
+// Mira los pedidos en curso (aún sin descontar) y avisa de lo que faltará en el stock cuando lleguen a «Listo».
+export function preverFaltas(lineas: LineaNecesidad[], stock: (LineaStock & { nombre_oficial: string })[]): Prevision[] {
+  const necesito = new Map<string, number>();
+  for (const l of lineas) {
+    if (!l.prenda_id || !l.color) continue;
+    for (const [talla, n] of Object.entries(l.tallas)) {
+      if (n <= 0) continue;
+      const s = stock.find((x) => x.prenda_id === l.prenda_id && norm(x.color) === norm(l.color) && x.talla === talla);
+      if (s) necesito.set(s.id, (necesito.get(s.id) ?? 0) + n);
+    }
+  }
+  return [...necesito]
+    .map(([id, n]) => {
+      const s = stock.find((x) => x.id === id)!;
+      return { nombre: s.nombre_oficial, color: s.color, talla: s.talla, necesito: n, hay: s.cantidad, falta: Math.max(0, n - s.cantidad) };
+    })
+    .filter((p) => p.falta > 0)
+    .sort((a, b) => b.falta - a.falta);
+}

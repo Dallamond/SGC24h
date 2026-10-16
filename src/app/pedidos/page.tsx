@@ -51,7 +51,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
         {ESTADOS.map((s) => {
           const n = pedidos.filter((p) => p.estado === s).length;
           return (
-            <Link key={s} href={href({ e: s })} replace className={cn("shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold", s === sel ? "bg-ink text-white" : "bg-ink/[0.06] text-ink/70")}>
+            <Link key={s} href={href({ e: s })} replace className={cn("shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95", s === sel ? "bg-ink text-white" : "bg-ink/[0.06] text-ink/70")}>
               {ESTADO_LABEL[s]} <span className="opacity-60">{n}</span>
             </Link>
           );
@@ -77,11 +77,11 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
                 {ESTADO_LABEL[estado]} <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs">{todos.length}</span>
               </h2>
               <div className="space-y-2">
-                {col.map((p) => {
+                {col.map((p, k) => {
                   const atrasado = !!p.fecha_entrega && p.fecha_entrega < hoy && EN_CURSO.includes(p.estado);
                   const anticipo = Number(p.anticipo ?? 0);
                   return (
-                    <article key={p.id} className={cn("card space-y-2 !p-3", atrasado && "!border-rust/50")}>
+                    <article key={p.id} style={{ animationDelay: `${k * 40}ms` }} className={cn("card space-y-2 !p-3", atrasado && "!border-rust/50")}>
                       <Link href={`/pedidos/${p.id}`} className="block">
                         <p className="flex justify-between font-semibold"><span>{refPedido(p.numero)}</span><span>{eur(Number(p.total))}</span></p>
                         <p className="text-sm text-ink/70">{p.sg_clientes?.nombre ?? "Sin cliente"} · {p.sg_pedido_lineas.reduce((s, l) => s + l.cantidad, 0)} uds</p>

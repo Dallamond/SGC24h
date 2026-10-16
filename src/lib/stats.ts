@@ -37,6 +37,7 @@ export interface Resumen {
   udsMes: number;
   udsTotal: number;         // prendas vendidas desde el principio
   aceptacion: number | null; // % de presupuestos resueltos que se aceptaron
+  anterior: { vendido: number; cobrado: number; gastos: number; uds: number; beneficio: number }; // mes pasado, para las tendencias
   porMes: { mes: string; etiqueta: string; vendido: number }[]; // últimos 6 meses
   topClientes: { id: string; nombre: string; total: number; pedidos: number }[];
   entregasProximas: PedidoStat[];
@@ -58,6 +59,17 @@ export function resumir(pedidos: PedidoStat[], ahora = new Date(), pagos: PagoSt
   const conCoste = delMes.filter((p) => !p.sinCoste);
   const ingresoConCoste = conCoste.reduce((s, p) => s + p.total, 0);
   const beneficioMes = ingresoConCoste - conCoste.reduce((s, p) => s + p.coste, 0);
+
+  const mesPrev = claveMes(new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1));
+  const delPrev = aceptados.filter((p) => claveMes(new Date(p.created_at)) === mesPrev);
+  const prevConCoste = delPrev.filter((p) => !p.sinCoste);
+  const anterior = {
+    vendido: delPrev.reduce((a, p) => a + p.total, 0),
+    cobrado: pagos.filter((p) => p.fecha.slice(0, 7) === mesPrev).reduce((a, p) => a + p.importe, 0),
+    gastos: gastos.filter((g) => g.fecha.slice(0, 7) === mesPrev).reduce((a, g) => a + g.importe, 0),
+    uds: delPrev.reduce((a, p) => a + p.uds, 0),
+    beneficio: prevConCoste.reduce((a, p) => a + p.total - p.coste, 0),
+  };
 
   const resueltos = pedidos.filter((p) => p.estado !== "posible");
   const meses = Array.from({ length: 6 }, (_, i) => {
@@ -100,6 +112,7 @@ export function resumir(pedidos: PedidoStat[], ahora = new Date(), pagos: PagoSt
     udsMes: delMes.reduce((s, p) => s + p.uds, 0),
     udsTotal: aceptados.reduce((s, p) => s + p.uds, 0),
     aceptacion: resueltos.length ? (aceptados.length / resueltos.length) * 100 : null,
+    anterior,
     porMes: meses,
     topClientes: [...porCliente.values()].sort((a, b) => b.total - a.total).slice(0, 5),
     entregasProximas,

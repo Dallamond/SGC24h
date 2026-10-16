@@ -5,6 +5,12 @@ import { ESTADO_LABEL, refPedido, type Estado } from "@/lib/types";
 import { eur, cn } from "@/lib/utils";
 import { completarTarea } from "./tareas/actions";
 import { PlancharBoton } from "@/components/PlancharBoton";
+import { NumeroAnimado } from "@/components/NumeroAnimado";
+import { Tendencia } from "@/components/Tendencia";
+import { AvisoCopia } from "@/components/AvisoCopia";
+import { costeRealLinea } from "@/lib/costes";
+import { preverFaltas } from "@/lib/stockPedido";
+import type { TamanoZona } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -14,15 +20,24 @@ interface FilaPedido {
   id: string; numero: number; estado: Estado; total: number; pagado: boolean; pagado_en: string | null; created_at: string;
   fecha_entrega: string | null; cliente_id: string | null;
   sg_clientes: { nombre: string } | null;
-  sg_pedido_lineas: { tipo: string; cantidad: number; coste_unitario: number | null }[];
+  stock_descontado: boolean;
+  sg_pedido_lineas: { tipo: "prenda" | "solo_estampado" | "servicio"; cantidad: number; coste_unitario: number | null; prenda_id: string | null; color: string | null; tallas: Record<string, number>; zonas: { tamano: TamanoZona }[] }[];
 }
 
-function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?: React.ReactNode; tono?: "bueno" | "malo" }) {
+type KpiProps = { titulo: string; valor: number; formato?: "eur" | "int"; sub?: React.ReactNode; tono?: "bueno" | "malo"; tendencia?: React.ReactNode; destacado?: boolean; i?: number };
+
+function Kpi({ titulo, valor, formato = "eur", sub, tono, tendencia, destacado, i = 0 }: KpiProps) {
   return (
-    <div className="card">
-      <p className="text-sm text-ink/60">{titulo}</p>
-      <p className={cn("mt-1 text-2xl font-bold md:text-3xl tracking-tight", tono === "bueno" && "text-sage-dark", tono === "malo" && "text-rust-dark")}>{valor}</p>
-      {sub && <p className="mt-0.5 text-xs text-ink/50">{sub}</p>}
+    <div
+      className={cn("card", destacado && "col-span-2 !border-0 bg-gradient-to-br from-rust to-rust-dark text-white lg:col-span-1")}
+      style={{ animationDelay: `${i * 60}ms` }}
+    >
+      <p className={cn("text-sm", destacado ? "text-white/80" : "text-ink/60")}>{titulo}</p>
+      <p className={cn("mt-1 font-bold tracking-tight", destacado ? "text-4xl md:text-3xl" : "text-2xl md:text-3xl", tono === "bueno" && "text-sage-dark", tono === "malo" && "text-rust-dark")}>
+        <NumeroAnimado valor={valor} formato={formato} />
+      </p>
+      {tendencia && <div className="mt-1">{tendencia}</div>}
+      {sub && <p className={cn("mt-0.5 text-xs", destacado ? "text-white/70" : "text-ink/50")}>{sub}</p>}
     </div>
   );
 }
@@ -30,8 +45,8 @@ function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?
 export default async function Inicio() {
   const db = await supabaseServer();
   const [{ data: ped, error }, { data: stock }, { data: tareas }, { data: pagosDb, error: errPagos }, { data: gastosDb }] = await Promise.all([
-    db.from("sg_pedidos").select("id,numero,estado,total,pagado,pagado_en,created_at,fecha_entrega,cliente_id, sg_clientes(nombre), sg_pedido_lineas(tipo,cantidad,coste_unitario)"),
-    db.from("sg_v_stock").select("valor,cantidad,reponer,tipo").eq("activa", true),
+    db.from("sg_pedidos").select("id,numero,estado,total,pagado,pagado_en,created_at,fecha_entrega,cliente_id,stock_descontado, sg_clientes(nombre), sg_pedido_lineas(tipo,cantidad,coste_unitario,prenda_id,color,tallas,zonas)"),
+    db.from("sg_v_stock").select("linea_id,prenda_id,nombre_oficial,color,talla,valor,cantidad,reponer,tipo").eq("activa", true),
     db.from("sg_tareas").select("id,texto,vence").eq("completada", false).order("vence", { ascending: true, nullsFirst: false }).limit(6),
     db.from("sg_pagos").select("pedido_id,importe,fecha"),
     db.from("sg_gastos").select("importe,fecha"),
@@ -53,11 +68,18 @@ export default async function Inicio() {
     fecha_entrega: p.fecha_entrega, cliente_id: p.cliente_id, cliente: p.sg_clientes?.nombre ?? null,
     // Cuentan las prendas estampadas (nuestras o del cliente); los servicios no son prendas.
     uds: p.sg_pedido_lineas.filter((l) => l.tipo !== "servicio").reduce((s, l) => s + l.cantidad, 0),
-    coste: p.sg_pedido_lineas.reduce((s, l) => s + Number(l.coste_unitario ?? 0) * l.cantidad, 0),
+    // Coste real: prenda + lámina DTF de cada zona + planchado.
+    coste: p.sg_pedido_lineas.reduce((s, l) => s + costeRealLinea(l).total, 0),
     sinCoste: p.sg_pedido_lineas.some((l) => l.coste_unitario === null),
   }));
   const r = resumir(stats, new Date(), pagos, gastos);
   const porId = new Map(filas.map((p, i) => [stats[i], p]));
+
+  // Pedidos aún sin descontar (aprobado → producción): ¿alcanzará el stock cuando lleguen a «Listo»?
+  const faltas = preverFaltas(
+    filas.filter((p) => ["aprobado", "diseno", "produccion"].includes(p.estado) && !p.stock_descontado).flatMap((p) => p.sg_pedido_lineas),
+    (stock ?? []).map((x) => ({ id: x.linea_id as string, prenda_id: x.prenda_id as string, talla: x.talla as string, color: x.color as string, cantidad: x.cantidad as number, nombre_oficial: x.nombre_oficial as string })),
+  );
 
   const valorStock = (stock ?? []).reduce((s, f) => s + Number(f.valor), 0);
   const uds = (stock ?? []).reduce((s, f) => s + f.cantidad, 0);
@@ -68,11 +90,11 @@ export default async function Inicio() {
 
   const extras = (
     <>
-      <Kpi titulo="Camisetas vendidas" valor={String(r.udsMes)} sub={`este mes · ${r.udsTotal} en total`} />
-      <Kpi titulo="Gastos del mes" valor={eur(r.gastosMes)} sub={<Link href="/gastos" className="font-semibold text-rust">Ver gastos</Link>} />
-      <Kpi titulo="Caja del mes" valor={eur(r.resultadoMes)} tono={r.resultadoMes >= 0 ? "bueno" : "malo"} sub="cobrado − gastos" />
-      <Kpi titulo="Beneficio estimado" valor={eur(r.beneficioMes)} sub={r.margenMes === null ? "faltan costes de prenda" : `margen ${r.margenMes.toFixed(0)} %`} />
-      <Kpi titulo="Presupuestos abiertos" valor={String(r.posibles)} sub={`${eur(r.valorPosibles)} en juego${r.aceptacion !== null ? ` · aceptación ${r.aceptacion.toFixed(0)} %` : ""}`} />
+      <Kpi i={4} titulo="Camisetas vendidas" valor={r.udsMes} formato="int" tendencia={<Tendencia actual={r.udsMes} anterior={r.anterior.uds} />} sub={`${r.udsTotal} en total`} />
+      <Kpi i={5} titulo="Gastos del mes" valor={r.gastosMes} tendencia={<Tendencia actual={r.gastosMes} anterior={r.anterior.gastos} masEsMalo />} sub={<Link href="/gastos" className="font-semibold text-rust">Ver gastos</Link>} />
+      <Kpi i={6} titulo="Caja del mes" valor={r.resultadoMes} tono={r.resultadoMes >= 0 ? "bueno" : "malo"} sub="cobrado − gastos" />
+      <Kpi i={7} titulo="Beneficio real" valor={r.beneficioMes} tendencia={<Tendencia actual={r.beneficioMes} anterior={r.anterior.beneficio} />} sub={r.margenMes === null ? "faltan costes de prenda" : `margen ${r.margenMes.toFixed(0)} % · con lámina y planchado`} />
+      <Kpi i={8} titulo="Presupuestos abiertos" valor={r.posibles} formato="int" sub={`${eur(r.valorPosibles)} en juego${r.aceptacion !== null ? ` · aceptación ${r.aceptacion.toFixed(0)} %` : ""}`} />
     </>
   );
 
@@ -81,7 +103,7 @@ export default async function Inicio() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Camis24h" className="-my-3 -ml-2 h-24 w-24 shrink-0 object-contain md:h-28 md:w-28" />
+          <img src="/logo.png" alt="Camis24h" className="-my-3 -ml-2 h-24 w-24 shrink-0 animate-fade-up object-contain md:h-28 md:w-28" />
           <h1 className="sr-only">Inicio</h1>
           <p className="text-sm capitalize text-ink/50">{new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</p>
         </div>
@@ -91,16 +113,36 @@ export default async function Inicio() {
         </div>
       </div>
 
+      <AvisoCopia />
+
+      {faltas.length > 0 && (
+        <section className="animate-fade-up rounded-2xl border border-rust/30 bg-rust/5 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-bold text-rust-dark">⚠ Te faltará stock para los pedidos en curso</h2>
+            <Link href="/inventario/compra" className="shrink-0 text-sm font-semibold text-rust">Registrar compra →</Link>
+          </div>
+          <ul className="mt-2 space-y-1 text-sm">
+            {faltas.slice(0, 6).map((f) => (
+              <li key={`${f.nombre}${f.color}${f.talla}`} className="flex justify-between gap-2">
+                <span>{f.nombre} · {f.color} · {f.talla}</span>
+                <span className="shrink-0 font-semibold text-rust-dark">faltan {f.falta} <span className="font-normal text-ink/50">(necesitas {f.necesito}, hay {f.hay})</span></span>
+              </li>
+            ))}
+          </ul>
+          {faltas.length > 6 && <p className="mt-1 text-xs text-ink/50">y {faltas.length - 6} más en el inventario</p>}
+        </section>
+      )}
+
       {/* En móvil solo lo esencial; el resto, desplegable */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-6">
-        <Kpi titulo={`Vendido en ${mesNombre}`} valor={eur(r.vendidoMes)} sub={r.ticketMedio ? `ticket medio ${eur(r.ticketMedio)}` : undefined} />
-        <Kpi titulo="Por cobrar" valor={eur(r.porCobrar)} tono={r.porCobrar > 0 ? "malo" : undefined} sub="total de pedidos − cobros" />
-        <Kpi titulo="Cobrado este mes" valor={eur(r.cobradoMes)} tono="bueno" sub="incluye anticipos" />
-        <Kpi titulo="Pedidos en curso" valor={String(r.activos)} sub="aprobados → listos" />
+        <Kpi i={0} destacado titulo={`Vendido en ${mesNombre}`} valor={r.vendidoMes} tendencia={<Tendencia claro actual={r.vendidoMes} anterior={r.anterior.vendido} />} sub={r.ticketMedio ? `ticket medio ${eur(r.ticketMedio)}` : undefined} />
+        <Kpi i={1} titulo="Por cobrar" valor={r.porCobrar} tono={r.porCobrar > 0 ? "malo" : undefined} sub="total de pedidos − cobros" />
+        <Kpi i={2} titulo="Cobrado este mes" valor={r.cobradoMes} tono="bueno" tendencia={<Tendencia actual={r.cobradoMes} anterior={r.anterior.cobrado} />} sub="incluye anticipos" />
+        <Kpi i={3} titulo="Pedidos en curso" valor={r.activos} formato="int" sub="aprobados → listos" />
         <div className="hidden md:contents">{extras}</div>
       </section>
       <details className="group md:hidden">
-        <summary className="cursor-pointer list-none rounded-xl border border-ink/10 bg-white py-2.5 text-center text-sm font-semibold text-ink/60 group-open:mb-3">
+        <summary className="cursor-pointer list-none rounded-xl border border-ink/10 bg-white py-2.5 text-center text-sm font-semibold text-ink/60 transition active:scale-[.98] group-open:mb-3">
           <span className="group-open:hidden">Ver más cifras</span>
           <span className="hidden group-open:inline">Ocultar</span>
         </summary>
@@ -111,10 +153,10 @@ export default async function Inicio() {
         <section className="card lg:col-span-2">
           <h2 className="mb-4 font-bold">Ventas últimos 6 meses</h2>
           <div className="flex h-44 items-end gap-3">
-            {r.porMes.map((m) => (
+            {r.porMes.map((m, i) => (
               <div key={m.mes} className="flex flex-1 flex-col items-center justify-end gap-1">
                 <span className="text-xs font-semibold text-ink/60">{m.vendido > 0 ? eur(m.vendido) : ""}</span>
-                <div className="w-full rounded-t-md bg-rust" style={{ height: `${Math.max(m.vendido > 0 ? 4 : 1, (m.vendido / maxMes) * 100)}%`, opacity: m.vendido > 0 ? 1 : 0.2 }} />
+                <div className="w-full origin-bottom animate-grow rounded-t-lg bg-gradient-to-t from-rust-dark to-rust-light" style={{ height: `${Math.max(m.vendido > 0 ? 4 : 1, (m.vendido / maxMes) * 100)}%`, opacity: m.vendido > 0 ? 1 : 0.2, animationDelay: `${i * 80}ms` }} />
                 <span className="text-xs uppercase text-ink/50">{m.etiqueta}</span>
               </div>
             ))}
