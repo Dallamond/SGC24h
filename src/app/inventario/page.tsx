@@ -31,14 +31,12 @@ export default async function Inventario() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Inventario</h1>
-        <div className="flex gap-2">
-          <PlancharBoton />
-          <Link href="/inventario/compra" className="btn-ghost">+ Compra</Link>
-          <Link href="/inventario/historial" className="btn-ghost">Historial</Link>
-          <Link href="/inventario/nueva" className="btn-ghost">+ Prenda</Link>
-        </div>
+      <h1 className="text-2xl font-bold">Inventario</h1>
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
+        <div className="hidden md:block"><PlancharBoton /></div>
+        <Link href="/inventario/compra" className="btn-ghost !py-2">+ Compra</Link>
+        <Link href="/inventario/nueva" className="btn-ghost !py-2">+ Prenda</Link>
+        <Link href="/inventario/historial" className="btn-ghost !py-2">Historial</Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

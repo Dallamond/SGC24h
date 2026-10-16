@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const ORDEN = ["XS", "S", "M", "L", "XL", "XXL", "U"];
 
 // Botón verde "Planchar": abre un desplegable para elegir prenda, color, talla y unidades y restarlas del stock.
-export function PlancharBoton({ className }: { className?: string }) {
+export function PlancharBoton({ className, icono }: { className?: string; icono?: React.ReactNode }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [lineas, setLineas] = useState<LineaStockUi[] | null>(null);
@@ -58,14 +58,14 @@ export function PlancharBoton({ className }: { className?: string }) {
 
   return (
     <>
-      <button onClick={abrir} className={cn("inline-flex items-center justify-center rounded-lg bg-sage px-4 py-2 font-semibold text-white transition hover:bg-sage-dark active:scale-95", className)}>
-        Planchar
+      <button onClick={abrir} aria-label="Planchar" className={cn("inline-flex items-center justify-center rounded-lg bg-sage px-4 py-2 font-semibold text-white transition hover:bg-sage-dark active:scale-95", className)}>
+        {icono ?? "Planchar"}
       </button>
 
       {abierto && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Planchar">
           <div className="absolute inset-0 bg-ink/30" onClick={() => setAbierto(false)} />
-          <div className="absolute inset-x-3 top-16 max-h-[85vh] overflow-y-auto rounded-2xl border border-ink/10 bg-white p-4 shadow-xl sm:inset-x-auto sm:right-6 sm:w-96">
+          <div className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-3xl border-t border-ink/10 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl md:inset-x-auto md:bottom-auto md:right-6 md:top-16 md:w-96 md:rounded-2xl md:border md:pb-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold">Planchar</h2>
               <button className="px-2 text-ink/40 hover:text-ink" onClick={() => setAbierto(false)} aria-label="Cerrar">✕</button>

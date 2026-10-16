@@ -21,7 +21,7 @@ function Kpi({ titulo, valor, sub, tono }: { titulo: string; valor: string; sub?
   return (
     <div className="card">
       <p className="text-sm text-ink/60">{titulo}</p>
-      <p className={cn("mt-1 text-3xl font-bold tracking-tight", tono === "bueno" && "text-sage-dark", tono === "malo" && "text-rust-dark")}>{valor}</p>
+      <p className={cn("mt-1 text-2xl font-bold md:text-3xl tracking-tight", tono === "bueno" && "text-sage-dark", tono === "malo" && "text-rust-dark")}>{valor}</p>
       {sub && <p className="mt-0.5 text-xs text-ink/50">{sub}</p>}
     </div>
   );
@@ -66,30 +66,44 @@ export default async function Inicio() {
   const hoy = new Date().toISOString().slice(0, 10);
   const mesNombre = new Date().toLocaleDateString("es-ES", { month: "long" });
 
+  const extras = (
+    <>
+      <Kpi titulo="Camisetas vendidas" valor={String(r.udsMes)} sub={`este mes · ${r.udsTotal} en total`} />
+      <Kpi titulo="Gastos del mes" valor={eur(r.gastosMes)} sub={<Link href="/gastos" className="font-semibold text-rust">Ver gastos</Link>} />
+      <Kpi titulo="Caja del mes" valor={eur(r.resultadoMes)} tono={r.resultadoMes >= 0 ? "bueno" : "malo"} sub="cobrado − gastos" />
+      <Kpi titulo="Beneficio estimado" valor={eur(r.beneficioMes)} sub={r.margenMes === null ? "faltan costes de prenda" : `margen ${r.margenMes.toFixed(0)} %`} />
+      <Kpi titulo="Presupuestos abiertos" valor={String(r.posibles)} sub={`${eur(r.valorPosibles)} en juego${r.aceptacion !== null ? ` · aceptación ${r.aceptacion.toFixed(0)} %` : ""}`} />
+    </>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5 md:space-y-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Inicio</h1>
           <p className="text-sm capitalize text-ink/50">{new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/pedidos/nuevo" className="btn">+ Presupuesto</Link>
-          <PlancharBoton />
+          <Link href="/pedidos/nuevo" className="btn !py-2">+ Presupuesto</Link>
+          <div className="hidden md:block"><PlancharBoton /></div>
         </div>
       </div>
 
+      {/* En móvil solo lo esencial; el resto, desplegable */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-6">
         <Kpi titulo={`Vendido en ${mesNombre}`} valor={eur(r.vendidoMes)} sub={r.ticketMedio ? `ticket medio ${eur(r.ticketMedio)}` : undefined} />
-        <Kpi titulo="Camisetas vendidas" valor={String(r.udsMes)} sub={`este mes · ${r.udsTotal} en total`} />
-        <Kpi titulo="Cobrado este mes" valor={eur(r.cobradoMes)} tono="bueno" sub="incluye anticipos" />
-        <Kpi titulo="Gastos del mes" valor={eur(r.gastosMes)} sub={<Link href="/gastos" className="font-semibold text-rust">Ver gastos</Link>} />
-        <Kpi titulo="Caja del mes" valor={eur(r.resultadoMes)} tono={r.resultadoMes >= 0 ? "bueno" : "malo"} sub="cobrado − gastos" />
         <Kpi titulo="Por cobrar" valor={eur(r.porCobrar)} tono={r.porCobrar > 0 ? "malo" : undefined} sub="total de pedidos − cobros" />
-        <Kpi titulo="Beneficio estimado" valor={eur(r.beneficioMes)} sub={r.margenMes === null ? "faltan costes de prenda" : `margen ${r.margenMes.toFixed(0)} %`} />
+        <Kpi titulo="Cobrado este mes" valor={eur(r.cobradoMes)} tono="bueno" sub="incluye anticipos" />
         <Kpi titulo="Pedidos en curso" valor={String(r.activos)} sub="aprobados → listos" />
-        <Kpi titulo="Presupuestos abiertos" valor={String(r.posibles)} sub={`${eur(r.valorPosibles)} en juego${r.aceptacion !== null ? ` · aceptación ${r.aceptacion.toFixed(0)} %` : ""}`} />
+        <div className="hidden md:contents">{extras}</div>
       </section>
+      <details className="group md:hidden">
+        <summary className="cursor-pointer list-none rounded-xl border border-ink/10 bg-white py-2.5 text-center text-sm font-semibold text-ink/60 group-open:mb-3">
+          <span className="group-open:hidden">Ver más cifras</span>
+          <span className="hidden group-open:inline">Ocultar</span>
+        </summary>
+        <div className="grid grid-cols-2 gap-3">{extras}</div>
+      </details>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card lg:col-span-2">

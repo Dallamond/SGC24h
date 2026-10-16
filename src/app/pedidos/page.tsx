@@ -11,8 +11,8 @@ type Fila = Pedido & { sg_clientes: { nombre: string } | null; sg_pedido_lineas:
 const ENTREGADOS_VISIBLES = 6;
 const EN_CURSO: Estado[] = ["aprobado", "diseno", "produccion", "listo"];
 
-export default async function Tablero({ searchParams }: { searchParams: Promise<{ q?: string; todos?: string }> }) {
-  const { q = "", todos: verTodos } = await searchParams;
+export default async function Tablero({ searchParams }: { searchParams: Promise<{ q?: string; todos?: string; e?: string }> }) {
+  const { q = "", todos: verTodos, e } = await searchParams;
   const db = await supabaseServer();
   const { data, error } = await db
     .from("sg_pedidos")
@@ -29,19 +29,34 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
   const hoy = new Date().toISOString().slice(0, 10);
   const atrasados = pedidos.filter((p) => p.fecha_entrega && p.fecha_entrega < hoy && EN_CURSO.includes(p.estado)).length;
 
+  // En móvil se ve una sola columna (pestañas); por defecto la primera en curso con pedidos.
+  const sel = (ESTADOS as readonly string[]).includes(e ?? "") ? (e as (typeof ESTADOS)[number]) :(EN_CURSO.find((s) => pedidos.some((p) => p.estado === s)) ?? "posible");
+  const href = (extra: Record<string, string>) => `/pedidos?${new URLSearchParams({ ...(q ? { q } : {}), ...extra })}`;
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Pedidos</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <form className="flex gap-2">
-            <input name="q" defaultValue={q} placeholder="Buscar cliente o nº…" className="!w-52" />
-            <button className="btn-ghost">Buscar</button>
-            {q && <Link href="/pedidos" className="btn-ghost">Limpiar</Link>}
-          </form>
-          <Link href="/pedidos/nuevo" className="btn">+ Presupuesto</Link>
-        </div>
+        <Link href="/pedidos/nuevo" className="btn !py-2">+ Presupuesto</Link>
       </div>
+
+      <form className="flex gap-2">
+        <input name="q" defaultValue={q} placeholder="Buscar cliente o nº…" className="md:!w-64" />
+        <input type="hidden" name="e" value={sel} />
+        <button className="btn-ghost">Buscar</button>
+        {q && <Link href={`/pedidos?e=${sel}`} className="btn-ghost" aria-label="Limpiar">✕</Link>}
+      </form>
+
+      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:hidden [scrollbar-width:none]" aria-label="Estados">
+        {ESTADOS.map((s) => {
+          const n = pedidos.filter((p) => p.estado === s).length;
+          return (
+            <Link key={s} href={href({ e: s })} replace className={cn("shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold", s === sel ? "bg-ink text-white" : "bg-ink/[0.06] text-ink/70")}>
+              {ESTADO_LABEL[s]} <span className="opacity-60">{n}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
       {atrasados > 0 && (
         <p className="rounded-xl border border-rust/30 bg-rust/5 px-4 py-2.5 text-sm font-semibold text-rust-dark">
@@ -49,7 +64,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {ESTADOS.map((estado, i) => {
           const todos = pedidos.filter((p) => p.estado === estado);
           // Los entregados se acumulan: por defecto solo los más recientes.
@@ -57,8 +72,8 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
           const ant = ESTADOS[i - 1];
           const sig = ESTADOS[i + 1];
           return (
-            <section key={estado} className="min-w-0 rounded-2xl bg-ink/[0.04] p-2.5">
-              <h2 className="mb-2 flex items-center justify-between px-1 text-sm font-bold uppercase tracking-wide text-ink/60">
+            <section key={estado} className={cn("min-w-0 rounded-2xl md:block md:bg-ink/[0.04] md:p-2.5", estado === sel ? "block" : "hidden")}>
+              <h2 className="mb-2 hidden items-center md:flex justify-between px-1 text-sm font-bold uppercase tracking-wide text-ink/60">
                 {ESTADO_LABEL[estado]} <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs">{todos.length}</span>
               </h2>
               <div className="space-y-2">
@@ -107,7 +122,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
                 })}
                 {!col.length && <p className="rounded-xl border border-dashed border-ink/15 p-4 text-center text-sm text-ink/40">Vacío</p>}
                 {todos.length > col.length && (
-                  <Link href={`/pedidos?${new URLSearchParams({ ...(q ? { q } : {}), todos: "1" })}`} className="block text-center text-xs font-semibold text-rust">
+                  <Link href={href({ e: sel, todos: "1" })} className="block text-center text-xs font-semibold text-rust">
                     Ver {todos.length - col.length} más
                   </Link>
                 )}
