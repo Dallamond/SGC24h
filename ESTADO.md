@@ -3,6 +3,11 @@
 Sistema de gestión interno de Camis24h (inventario, presupuestos, pedidos). Hoja de ruta: `Sistema de Gestión MVP.md` en la vault.
 Supabase propio, en otra cuenta distinta a la de la web (no comparten BD).
 
+## Hecho (v6 · 16/10/2026)
+- Versión móvil: barra inferior (Inicio, Pedidos, Planchar, Stock, Más), pestañas de estado en Pedidos, Inicio compacto.
+- Foto por modelo de prenda en Inventario (cámara/galería) y al crear prenda. Migración `0005_imagen_prenda.sql` (ejecutar antes de usar fotos).
+- Calculadora (`/calculadora`): prenda del inventario + medidas DTF → coste de producción, tarifa oficial, mínimo por margen y precio recomendado. Parámetros editables (lámina 10 €/5.500 cm², aprovechamiento 85 %, planchado 0,50 €, margen 50 %).
+
 ## Hecho (v2 · 15/10/2026 noche)
 - Inicio con KPIs (vendido, cobrado, por cobrar, beneficio estimado, aceptación), ventas 6 meses, entregas, mejores clientes, tareas e inventario.
 - Tareas con fecha límite y completar. Tablero a ancho completo sin scroll horizontal.

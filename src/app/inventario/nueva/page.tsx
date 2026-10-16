@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { crearPrenda } from "../actions";
+import { SelectorFoto } from "./SelectorFoto";
 
 export default function NuevaPrenda() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function NuevaPrenda() {
   return (
     <form action={accion} className="card mx-auto max-w-lg space-y-4">
       <h1 className="text-xl font-bold">Nueva prenda</h1>
+      <SelectorFoto />
       <div><label>Nombre oficial (el de la etiqueta)</label><input name="nombre_oficial" required placeholder="JHK TSRA 190" /></div>
       <div className="grid grid-cols-2 gap-3">
         <div><label>Tipo</label><select name="tipo"><option value="camiseta">Camiseta</option><option value="sudadera">Sudadera</option><option value="polo">Polo</option><option value="totebag">Totebag</option><option value="consumible">Consumible</option></select></div>

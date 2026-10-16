@@ -60,10 +60,10 @@ interface Modelo {
   proveedor?: string; tallas: string[]; colores: string[];
 }
 
-async function insertarModelo(db: Awaited<ReturnType<typeof supabaseServer>>, m: Modelo, cantidad: number, minimo = 0) {
+async function insertarModelo(db: Awaited<ReturnType<typeof supabaseServer>>, m: Modelo, cantidad: number, minimo = 0, imagen?: string) {
   const { data: prenda, error } = await db
     .from("sg_prendas")
-    .insert({ nombre_oficial: m.nombre_oficial, tipo: m.tipo, gramaje: m.gramaje ?? null, precio_compra: m.precio_compra, proveedor: m.proveedor ?? null, stock_minimo: minimo })
+    .insert({ nombre_oficial: m.nombre_oficial, tipo: m.tipo, gramaje: m.gramaje ?? null, precio_compra: m.precio_compra, proveedor: m.proveedor ?? null, stock_minimo: minimo, ...(imagen ? { imagen_path: imagen } : {}) })
     .select("id")
     .single();
   if (error) return error.message;
@@ -88,6 +88,7 @@ export async function crearPrenda(_: unknown, form: FormData) {
     { ...p.data, gramaje: p.data.gramaje, proveedor: p.data.proveedor || undefined, tallas: tallas.length ? tallas : ["U"], colores: colores.length ? colores : ["único"] },
     cantidad,
     p.data.stock_minimo,
+    /^prendas\/[\w./-]+$/.test(String(form.get("imagen_path") ?? "")) ? String(form.get("imagen_path")) : undefined,
   );
   if (err) return { ok: false as const, error: err };
   revalidatePath("/inventario");
@@ -159,4 +160,18 @@ export async function cargarRecuento() {
   }
   revalidatePath("/", "layout");
   return { ok: true as const, aplicadas };
+}
+
+// Asigna (o quita, con null) la imagen de un modelo. La subida la hace el navegador; aquí solo se guarda la ruta
+// y se borra la foto anterior para no acumular archivos en el plan gratis de Storage.
+export async function fijarImagen(prendaId: string, path: string | null) {
+  z.object({ prendaId: z.string().uuid(), path: z.string().regex(/^prendas\/[\w./-]+$/).nullable() }).parse({ prendaId, path });
+  const db = await supabaseServer();
+  const { data: antes } = await db.from("sg_prendas").select("imagen_path").eq("id", prendaId).maybeSingle();
+  const { error } = await db.from("sg_prendas").update({ imagen_path: path }).eq("id", prendaId);
+  if (error) return { ok: false as const, error: error.message.includes("imagen_path") ? "Falta ejecutar la migración 0005" : error.message };
+  if (antes?.imagen_path && antes.imagen_path !== path) await db.storage.from("adjuntos").remove([antes.imagen_path]);
+  revalidatePath("/inventario");
+  revalidatePath("/calculadora");
+  return { ok: true as const };
 }

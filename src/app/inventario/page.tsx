@@ -4,6 +4,7 @@ import { eur, cn } from "@/lib/utils";
 import { TALLA_LABEL } from "@/lib/types";
 import { CantidadLinea, CargarInicial, CargarRecuento, MinimoPrenda, PrecioPrenda } from "./Editores";
 import { PlancharBoton } from "@/components/PlancharBoton";
+import { ImagenPrenda } from "@/components/ImagenPrenda";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,12 @@ export default async function Inventario() {
   const total = filas.reduce((s, f) => s + Number(f.valor), 0);
   const unidades = filas.reduce((s, f) => s + f.cantidad, 0);
   const reponer = filas.filter((f) => f.reponer && f.tipo !== "consumible");
+
+  // Fotos de los modelos (si la migración 0005 aún no está, simplemente no hay fotos).
+  const { data: imgs } = await db.from("sg_prendas").select("id,imagen_path").not("imagen_path", "is", null);
+  const conFoto = (imgs ?? []) as { id: string; imagen_path: string }[];
+  const { data: firmadas } = conFoto.length ? await db.storage.from("adjuntos").createSignedUrls(conFoto.map((i) => i.imagen_path), 3600) : { data: [] };
+  const fotoDe = new Map(conFoto.map((i, k) => [i.id, firmadas?.[k]?.signedUrl ?? null]));
 
   const prendas = new Map<string, Fila[]>();
   for (const f of filas) prendas.set(f.prenda_id, [...(prendas.get(f.prenda_id) ?? []), f]);
@@ -56,12 +63,13 @@ export default async function Inventario() {
           const subtotal = lineas.reduce((s, l) => s + Number(l.valor), 0);
           return (
             <section key={p.prenda_id} className="card space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+              <div className="flex items-start gap-3">
+                <ImagenPrenda prendaId={p.prenda_id} url={fotoDe.get(p.prenda_id) ?? null} />
+                <div className="min-w-0 flex-1">
                   <h2 className="font-bold">{p.nombre_oficial}</h2>
                   <p className="text-xs text-ink/50">{TIPO_LABEL[p.tipo]}{p.gramaje ? ` · ${p.gramaje} g/m²` : ""}{p.proveedor ? ` · ${p.proveedor}` : ""}</p>
                 </div>
-                <p className="text-sm font-semibold">{eur(subtotal)}</p>
+                <p className="shrink-0 text-sm font-semibold">{eur(subtotal)}</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg bg-paper p-2.5 text-sm">

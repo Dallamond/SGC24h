@@ -13,12 +13,13 @@ const LINKS = [
   { href: "/tareas", label: "Tareas" },
   { href: "/clientes", label: "Clientes" },
   { href: "/inventario", label: "Inventario" },
+  { href: "/calculadora", label: "Calculadora" },
   { href: "/gastos", label: "Gastos" },
   { href: "/copias", label: "Copias" },
 ];
 
 // Secundarias: en el móvil viven dentro de «Más».
-const MAS = LINKS.filter((l) => ["/tareas", "/clientes", "/gastos", "/copias"].includes(l.href));
+const MAS = LINKS.filter((l) => ["/calculadora", "/tareas", "/clientes", "/gastos", "/copias"].includes(l.href));
 
 const activo = (path: string, href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
