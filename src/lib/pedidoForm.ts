@@ -1,4 +1,4 @@
-import type { ZonaPedido } from "@/lib/pricing";
+import { TAMANOS_ZONA, type TamanoZona, type ZonaPedido } from "@/lib/pricing";
 import type { PedidoLinea, TipoLinea } from "@/lib/types";
 
 // Estado de una línea en el formulario de presupuesto.
@@ -45,4 +45,28 @@ export function lineaAForm(l: PedidoLinea): LineaForm {
     // Si el precio coincide con el propuesto se deja en blanco: así se recalcula al cambiar tallas o zonas.
     precioManual: Number(l.precio_unitario) !== Number(l.precio_calculado) ? String(l.precio_unitario) : "",
   };
+}
+
+const TAMANOS_VALIDOS = Object.keys(TAMANOS_ZONA);
+
+// Presupuesto prellenado desde la calculadora (parámetros de la URL, todos opcionales y validados).
+export function lineaDesdeCalculadora(
+  q: { prenda?: string; propia: boolean; uds?: string; zonas?: string; precio?: string },
+  prendas: { id: string; colores: string[] }[],
+): Inicial {
+  const zonas: ZonaPedido[] = (q.zonas ?? "").split(",").filter((t) => TAMANOS_VALIDOS.includes(t)).map((t) => ({ tamano: t as TamanoZona, vista: "delante" }));
+  const uds = Math.max(1, Math.floor(Number(q.uds)) || 1);
+  const precio = Number(q.precio);
+  const modelo = q.propia ? undefined : prendas.find((p) => p.id === q.prenda);
+  const linea: LineaForm = {
+    tipo: modelo ? "prenda" : "solo_estampado",
+    prendaId: modelo?.id ?? "",
+    libre: "",
+    color: modelo && modelo.colores.length === 1 ? modelo.colores[0] : "",
+    tallas: {},
+    unidades: String(uds),
+    zonas: zonas.length ? zonas : [{ tamano: "normal-pequeno", vista: "delante" }],
+    precioManual: precio > 0 && precio < 1000 ? String(precio) : "",
+  };
+  return { clienteId: "", lineas: [linea], envio: "", descuento: "", validez: "15", entrega: "", notas: "" };
 }

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { TAMANOS_ZONA, type TamanoZona } from "@/lib/pricing";
-import { calcularCoste, medidaZona, PARAMS_POR_DEFECTO, type ParamsCoste } from "@/lib/costes";
+import Link from "next/link";
+import { calcularCoste, medidaZona, PARAMS_POR_DEFECTO, zonaPorArea, type ParamsCoste } from "@/lib/costes";
 import { cn, eur } from "@/lib/utils";
 
 export interface PrendaCalc { id: string; nombre_oficial: string; tipo: string; precio_compra: number; foto: string | null }
@@ -45,6 +46,14 @@ export function Calculadora({ prendas }: { prendas: PrendaCalc[] }) {
     [prenda, propia, uds, disenos, params],
   );
   const cambiar = (i: number, c: Partial<FilaDiseno>) => setDisenos((ds) => ds.map((d, k) => (k === i ? { ...d, ...c } : d)));
+  // Enlace al formulario de presupuesto con lo calculado (zonas, unidades y, si supera la tarifa, el precio).
+  const medidas = disenos.map((d) => (d.preset === "custom" ? { ancho: num(d.ancho), alto: num(d.alto) } : medidaZona(d.preset))).filter((m) => m.ancho > 0 && m.alto > 0);
+  const enlace = `/pedidos/nuevo?${new URLSearchParams({
+    ...(propia || !prenda ? { propia: "1" } : { prenda: prenda.id }),
+    uds: String(Math.floor(num(uds)) || 1),
+    zonas: medidas.map(zonaPorArea).join(","),
+    ...(res.tarifaUd !== null && res.recomendadoUd > res.tarifaUd ? { precio: String(res.recomendadoUd) } : {}),
+  })}`;
   const sinPrecio = !propia && prenda && prenda.precio_compra === 0;
 
   return (
@@ -101,6 +110,8 @@ export function Calculadora({ prendas }: { prendas: PrendaCalc[] }) {
           <p className="text-4xl font-bold tracking-tight text-sage-dark">{eur(res.recomendadoUd)}<span className="text-base font-semibold"> /ud</span></p>
           {res.totalPedido > 0 && <p className="mt-1 text-sm text-ink/60">{eur(res.totalPedido)} el pedido · beneficio {eur(res.beneficioPedido)} ({pct(res.margen)})</p>}
         </div>
+
+        {medidas.length > 0 && <Link href={enlace} className="btn w-full">Crear presupuesto con esto</Link>}
 
         {res.tarifaBaja && (
           <p className="rounded-lg bg-rust/10 p-2.5 text-sm font-semibold text-rust-dark">

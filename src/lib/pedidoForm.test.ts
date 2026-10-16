@@ -29,3 +29,18 @@ describe("lineaAForm", () => {
     expect(s).toMatchObject({ prendaId: "", libre: "Digitalización", precioManual: "15", unidades: "2" });
   });
 });
+
+import { lineaDesdeCalculadora } from "./pedidoForm";
+
+describe("lineaDesdeCalculadora", () => {
+  const prendas = [{ id: "p1", colores: ["negro"] }, { id: "p2", colores: ["blanco", "negro"] }];
+  it("monta una línea de prenda con zonas, unidades y precio", () => {
+    const l = lineaDesdeCalculadora({ prenda: "p1", propia: false, uds: "5", zonas: "masivo,manga,raro", precio: "19.5" }, prendas).lineas[0];
+    expect(l).toMatchObject({ tipo: "prenda", prendaId: "p1", color: "negro", unidades: "5", precioManual: "19.5" });
+    expect(l.zonas.map((z) => z.tamano)).toEqual(["masivo", "manga"]);
+  });
+  it("si la trae el cliente es solo estampado; sin color si hay varios", () => {
+    expect(lineaDesdeCalculadora({ propia: true }, prendas).lineas[0].tipo).toBe("solo_estampado");
+    expect(lineaDesdeCalculadora({ prenda: "p2", propia: false }, prendas).lineas[0].color).toBe("");
+  });
+});
